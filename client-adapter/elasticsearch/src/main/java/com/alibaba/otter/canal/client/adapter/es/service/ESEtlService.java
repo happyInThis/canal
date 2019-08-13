@@ -67,7 +67,7 @@ public class ESEtlService extends AbstractEtlService {
             if (response.getFailure().getStatus() == RestStatus.NOT_FOUND) {
                 logger.warn(response.getFailureMessage());
             } else {
-                logger.error("全量导入数据有误 {}", response.getFailureMessage());
+                logger.error("全量导入数据有误 {},response:{}", response.getFailureMessage(), response);
                 throw new RuntimeException("全量数据 etl 异常: " + response.getFailureMessage());
             }
         }
@@ -76,140 +76,162 @@ public class ESEtlService extends AbstractEtlService {
     protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
                                        AdapterConfig.AdapterMapping adapterMapping, AtomicLong impCount,
                                        List<String> errMsg) {
-        try {
-            ESMapping mapping = (ESMapping) adapterMapping;
-            return Util.sqlRS(ds, sql, values, rs -> {
-                Long lastId = 0L;
-                try {
-                    ESBulkRequest esBulkRequest = this.esConnection.new ESBulkRequest();
-                    long batchBegin = System.currentTimeMillis();
-                    while (rs.next()) {
-                        lastId = rs.getLong("id");
-                        Map<String, Object> esFieldData = new LinkedHashMap<>();
-                        Object idVal = null;
-                        for (FieldItem fieldItem : mapping.getSchemaItem().getSelectFields().values()) {
+        ESMapping mapping = (ESMapping) adapterMapping;
+        return Util.sqlRS(ds, sql, values, rs -> {
+            Long lastId = 0L;
+            int count = 0;
+            try {
+                ESBulkRequest esBulkRequest = this.esConnection.new ESBulkRequest();
+                long batchBegin = System.currentTimeMillis();
+                while (rs.next()) {
+                    lastId = rs.getLong("id");
+                    count += 1;
+                    Map<String, Object> esFieldData = new LinkedHashMap<>();
+                    Object idVal = null;
+                    for (FieldItem fieldItem : mapping.getSchemaItem().getSelectFields().values()) {
 
-                            String fieldName = fieldItem.getFieldName();
-                            if (mapping.getSkips().contains(fieldName)) {
-                                continue;
-                            }
-
-                            // 如果是主键字段则不插入
-                            if (fieldItem.getFieldName().equals(mapping.get_id())) {
-                                idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
-                            } else {
-                                Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
-                                esFieldData.put(Util.cleanColumn(fieldName), val);
-                            }
-
+                        String fieldName = fieldItem.getFieldName();
+                        if (mapping.getSkips().contains(fieldName)) {
+                            continue;
                         }
 
-                        if (!mapping.getRelations().isEmpty()) {
-                            mapping.getRelations().forEach((relationField, relationMapping) -> {
-                                Map<String, Object> relations = new HashMap<>();
-                                relations.put("name", relationMapping.getName());
-                                if (StringUtils.isNotEmpty(relationMapping.getParent())) {
-                                    FieldItem parentFieldItem = mapping.getSchemaItem()
-                                        .getSelectFields()
-                                        .get(relationMapping.getParent());
-                                    Object parentVal;
-                                    try {
-                                        parentVal = esTemplate.getValFromRS(mapping,
-                                            rs,
-                                            parentFieldItem.getFieldName(),
-                                            parentFieldItem.getFieldName());
-                                    } catch (SQLException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    if (parentVal != null) {
-                                        relations.put("parent", parentVal.toString());
-                                        esFieldData.put("$parent_routing", parentVal.toString());
-
-                                    }
-                                }
-                                esFieldData.put(Util.cleanColumn(relationField), relations);
-                            });
-                        }
-
-                        if (idVal != null) {
-                            String parentVal = (String) esFieldData.remove("$parent_routing");
-                            if (mapping.isUpsert()) {
-                                ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(
-                                    mapping.get_index(),
-                                    mapping.get_type(),
-                                    idVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
-
-                                if (StringUtils.isNotEmpty(parentVal)) {
-                                    esUpdateRequest.setRouting(parentVal);
-                                }
-
-                                esBulkRequest.add(esUpdateRequest);
-                            } else {
-                                ESIndexRequest esIndexRequest = this.esConnection.new ESIndexRequest(mapping
-                                    .get_index(), mapping.get_type(), idVal.toString()).setSource(esFieldData);
-                                if (StringUtils.isNotEmpty(parentVal)) {
-                                    esIndexRequest.setRouting(parentVal);
-                                }
-                                esBulkRequest.add(esIndexRequest);
-                            }
+                        // 如果是主键字段则不插入
+                        if (fieldItem.getFieldName().equals(mapping.get_id())) {
+                            idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
                         } else {
-                            idVal = esFieldData.get(mapping.getPk());
-                            ESSearchRequest esSearchRequest = this.esConnection.new ESSearchRequest(mapping.get_index(),
-                                mapping.get_type()).setQuery(QueryBuilders.termQuery(mapping.getPk(), idVal))
-                                    .size(10000);
-                            SearchResponse response = esSearchRequest.getResponse();
-                            for (SearchHit hit : response.getHits()) {
-                                ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping
-                                    .get_index(), mapping.get_type(), hit.getId()).setDoc(esFieldData);
-                                esBulkRequest.add(esUpdateRequest);
-                            }
+                            Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
+                            esFieldData.put(Util.cleanColumn(fieldName), val);
                         }
 
-                        if (esBulkRequest.numberOfActions() % mapping.getCommitBatch() == 0
-                            && esBulkRequest.numberOfActions() > 0) {
-                            long esBatchBegin = System.currentTimeMillis();
-                            BulkResponse rp = esBulkRequest.bulk();
-                            if (rp.hasFailures()) {
-                                logger.error("has failures response:{}", JSON.toJSONString(rp));
-                                this.processFailBulkResponse(rp);
-                            }
-
-                            logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index: {}, lastId:{}",
-                                (System.currentTimeMillis() - batchBegin),
-                                (System.currentTimeMillis() - esBatchBegin),
-                                esBulkRequest.numberOfActions(),
-                                mapping.get_index(),
-                                lastId);
-                            batchBegin = System.currentTimeMillis();
-                            esBulkRequest.resetBulk();
-                        }
-                        impCount.incrementAndGet();
                     }
 
-                    if (esBulkRequest.numberOfActions() > 0) {
+                    if (!mapping.getRelations().isEmpty()) {
+                        mapping.getRelations().forEach((relationField, relationMapping) -> {
+                            Map<String, Object> relations = new HashMap<>();
+                            relations.put("name", relationMapping.getName());
+                            if (StringUtils.isNotEmpty(relationMapping.getParent())) {
+                                FieldItem parentFieldItem = mapping.getSchemaItem()
+                                    .getSelectFields()
+                                    .get(relationMapping.getParent());
+                                Object parentVal;
+                                try {
+                                    parentVal = esTemplate.getValFromRS(mapping,
+                                        rs,
+                                        parentFieldItem.getFieldName(),
+                                        parentFieldItem.getFieldName());
+                                } catch (SQLException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                if (parentVal != null) {
+                                    relations.put("parent", parentVal.toString());
+                                    esFieldData.put("$parent_routing", parentVal.toString());
+
+                                }
+                            }
+                            if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
+                                FieldItem routingFieldItem = mapping.getSchemaItem()
+                                    .getSelectFields()
+                                    .get(relationMapping.getRouting());
+                                Object routingVal;
+                                try {
+                                    routingVal = esTemplate.getValFromRS(mapping,
+                                        rs,
+                                        routingFieldItem.getFieldName(),
+                                        routingFieldItem.getFieldName());
+                                } catch (SQLException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                if (routingVal != null) {
+                                    esFieldData.put("$routing", routingVal.toString());
+                                }
+                            }
+                            esFieldData.put(Util.cleanColumn(relationField), relations);
+                        });
+                    }
+
+                    if (idVal != null) {
+                        String parentVal = (String) esFieldData.remove("$parent_routing");
+                        String routingVal = (String) esFieldData.remove("$routing");
+                        if (mapping.isUpsert()) {
+                            ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(
+                                mapping.get_index(),
+                                mapping.get_type(),
+                                idVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
+
+                            if (StringUtils.isNotEmpty(routingVal)) {
+                                esUpdateRequest.setRouting(routingVal);
+                            }
+                            if (StringUtils.isNotEmpty(parentVal)) {
+                                esUpdateRequest.setRouting(parentVal);
+                            }
+
+                            esBulkRequest.add(esUpdateRequest);
+                        } else {
+                            ESIndexRequest esIndexRequest = this.esConnection.new ESIndexRequest(mapping
+                                .get_index(), mapping.get_type(), idVal.toString()).setSource(esFieldData);
+                            if (StringUtils.isNotEmpty(routingVal)) {
+                                esIndexRequest.setRouting(routingVal);
+                            }
+                            if (StringUtils.isNotEmpty(parentVal)) {
+                                esIndexRequest.setRouting(parentVal);
+                            }
+                            esBulkRequest.add(esIndexRequest);
+                        }
+                    } else {
+                        idVal = esFieldData.get(mapping.getPk());
+                        ESSearchRequest esSearchRequest = this.esConnection.new ESSearchRequest(mapping.get_index(),
+                            mapping.get_type()).setQuery(QueryBuilders.termQuery(mapping.getPk(), idVal))
+                                .size(10000);
+                        SearchResponse response = esSearchRequest.getResponse();
+                        for (SearchHit hit : response.getHits()) {
+                            ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping
+                                .get_index(), mapping.get_type(), hit.getId()).setDoc(esFieldData);
+                            esBulkRequest.add(esUpdateRequest);
+                        }
+                    }
+
+                    if (esBulkRequest.numberOfActions() % mapping.getCommitBatch() == 0
+                        && esBulkRequest.numberOfActions() > 0) {
                         long esBatchBegin = System.currentTimeMillis();
                         BulkResponse rp = esBulkRequest.bulk();
                         if (rp.hasFailures()) {
                             this.processFailBulkResponse(rp);
                         }
-                        logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, lastId:{}",
+
+                        logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index: {}, lastId:{}",
                             (System.currentTimeMillis() - batchBegin),
                             (System.currentTimeMillis() - esBatchBegin),
                             esBulkRequest.numberOfActions(),
                             mapping.get_index(),
                             lastId);
+                        batchBegin = System.currentTimeMillis();
+                        esBulkRequest.resetBulk();
                     }
-                } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
-                    errMsg.add(mapping.get_index() + " etl failed! ==>" + e.getMessage());
-                    throw new RuntimeException(e);
+                    impCount.incrementAndGet();
                 }
-                return lastId;
-            });
 
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-            return 0L;
-        }
+                if (esBulkRequest.numberOfActions() > 0) {
+                    long esBatchBegin = System.currentTimeMillis();
+                    BulkResponse rp = esBulkRequest.bulk();
+                    if (rp.hasFailures()) {
+                        this.processFailBulkResponse(rp);
+                    }
+                    logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, lastId:{}",
+                        (System.currentTimeMillis() - batchBegin),
+                        (System.currentTimeMillis() - esBatchBegin),
+                        esBulkRequest.numberOfActions(),
+                        mapping.get_index(),
+                        lastId);
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+                errMsg.add(mapping.get_index() + " etl failed! ==>" + e.getMessage());
+                throw new RuntimeException(e);
+            }
+            Map result = new HashMap();
+            result.put("lastId", lastId);
+            result.put("count", count);
+            return result;
+        });
     }
 }

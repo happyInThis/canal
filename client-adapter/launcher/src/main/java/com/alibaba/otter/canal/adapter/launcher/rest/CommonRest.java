@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
@@ -39,7 +40,7 @@ public class CommonRest {
     private static Logger                 logger           = LoggerFactory.getLogger(CommonRest.class);
 
     private static final String           ETL_LOCK_ZK_NODE = "/sync-etl/";
-
+    private static AtomicInteger count = new AtomicInteger(0);
     private ExtensionLoader<OuterAdapter> loader;
 
     @Resource
@@ -78,7 +79,8 @@ public class CommonRest {
 //            return result;
 //        }
         try {
-
+            //统计发起的次数
+            count.addAndGet(1);
             boolean oriSwitchStatus;
             if (destination != null) {
                 oriSwitchStatus = syncSwitch.status(destination);
@@ -104,10 +106,13 @@ public class CommonRest {
                 result.setErrorMessage(e.getMessage());
                 return result;
             } finally {
-                if (destination != null && oriSwitchStatus) {
-                    syncSwitch.on(destination);
-                } else if (destination == null && oriSwitchStatus) {
-                    syncSwitch.on(task);
+                int i = count.decrementAndGet();
+                if(i <= 0) {
+                    if(destination != null && oriSwitchStatus) {
+                        syncSwitch.on(destination);
+                    } else if(destination == null && oriSwitchStatus) {
+                        syncSwitch.on(task);
+                    }
                 }
             }
         } finally {

@@ -68,10 +68,14 @@ public class ESTemplate {
     public void insert(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");
+            String routingVal = (String) esFieldData.remove("$routing");
             if (mapping.isUpsert()) {
                 ESUpdateRequest updateRequest = esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    updateRequest.setRouting(routingVal);
+                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     updateRequest.setRouting(parentVal);
                 }
@@ -80,6 +84,9 @@ public class ESTemplate {
                 ESIndexRequest indexRequest = esConnection.new ESIndexRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setSource(esFieldData);
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    indexRequest.setRouting(routingVal);
+                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     indexRequest.setRouting(parentVal);
                 }
@@ -225,10 +232,14 @@ public class ESTemplate {
     private void append4Update(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");
+            String routingVal = (String) esFieldData.remove("$routing");
             if (mapping.isUpsert()) {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
+                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     esUpdateRequest.setRouting(parentVal);
                 }
@@ -237,6 +248,9 @@ public class ESTemplate {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setDoc(esFieldData);
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
+                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     esUpdateRequest.setRouting(parentVal);
                 }
@@ -445,6 +459,21 @@ public class ESTemplate {
 
                     }
                 }
+                if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
+                    FieldItem routingFieldItem = schemaItem.getSelectFields().get(relationMapping.getRouting());
+                    Object routingVal;
+                    try {
+                        routingVal = getValFromRS(mapping,
+                                resultSet,
+                                routingFieldItem.getFieldName(),
+                                routingFieldItem.getFieldName());
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    if (routingVal != null) {
+                        esFieldData.put("$routing", routingVal.toString());
+                    }
+                }
                 esFieldData.put(relationField, relations);
             });
         }
@@ -465,6 +494,14 @@ public class ESTemplate {
                         relations.put("parent", parentVal.toString());
                         esFieldData.put("$parent_routing", parentVal.toString());
 
+                    }
+                }
+                if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
+                    FieldItem routingFieldItem = schemaItem.getSelectFields().get(relationMapping.getRouting());
+                    String columnName = routingFieldItem.getColumnItems().iterator().next().getColumnName();
+                    Object routingVal = getValFromData(mapping, dmlData, routingFieldItem.getFieldName(), columnName);
+                    if (routingVal != null) {
+                        esFieldData.put("$routing", routingVal.toString());
                     }
                 }
                 esFieldData.put(relationField, relations);

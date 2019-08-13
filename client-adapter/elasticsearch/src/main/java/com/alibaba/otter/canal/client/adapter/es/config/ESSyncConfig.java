@@ -221,6 +221,7 @@ public class ESSyncConfig implements AdapterConfig {
 
         private String name;
         private String parent;
+        private String routing;
 
         public String getName() {
             return name;
@@ -236,6 +237,14 @@ public class ESSyncConfig implements AdapterConfig {
 
         public void setParent(String parent) {
             this.parent = parent;
+        }
+
+        public String getRouting() {
+            return routing;
+        }
+
+        public void setRouting(String routing) {
+            this.routing = routing;
         }
     }
 }

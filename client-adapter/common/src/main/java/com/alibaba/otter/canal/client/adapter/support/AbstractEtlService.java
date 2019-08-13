@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractEtlService {
@@ -75,10 +76,13 @@ public abstract class AbstractEtlService {
             if (cnt >= 10000) {
 
                 long size = CNT_PER_TASK;
-
-                while(endId > startId) {
+                Map result ;
+                int count = 1;
+                while(endId > startId && count > 0) {
                     String sqlFinal = sql + " LIMIT " + size;
-                    startId = (Long) executeSqlImport(dataSource, sqlFinal, values, config.getMapping(), impCount, errMsg);
+                    result = (Map) executeSqlImport(dataSource, sqlFinal, values, config.getMapping(), impCount, errMsg);
+                    startId = (Long) result.get("lastId");
+                    count = (int) result.get("count");
                     values.remove(0);
                     values.add(0, startId);
                 }
