@@ -68,15 +68,15 @@ public class CommonRest {
                          @RequestParam(name = "params", required = false) String params) {
         OuterAdapter adapter = loader.getExtension(type, key);
         String destination = adapter.getDestination(task);
-        String lockKey = destination == null ? task : destination;
-
-        boolean locked = etlLock.tryLock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
-        if (!locked) {
-            EtlResult result = new EtlResult();
-            result.setSucceeded(false);
-            result.setErrorMessage(task + " 有其他进程正在导入中, 请稍后再试");
-            return result;
-        }
+//        String lockKey = destination == null ? task : destination;
+//
+//        boolean locked = etlLock.tryLock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
+//        if (!locked) {
+//            EtlResult result = new EtlResult();
+//            result.setSucceeded(false);
+//            result.setErrorMessage(task + " 有其他进程正在导入中, 请稍后再试");
+//            return result;
+//        }
         try {
 
             boolean oriSwitchStatus;
@@ -98,6 +98,11 @@ public class CommonRest {
                     paramArray = Arrays.asList(params.trim().split(";"));
                 }
                 return adapter.etl(task, paramArray);
+            } catch(Exception e) {
+                EtlResult result = new EtlResult();
+                result.setSucceeded(false);
+                result.setErrorMessage(e.getMessage());
+                return result;
             } finally {
                 if (destination != null && oriSwitchStatus) {
                     syncSwitch.on(destination);
@@ -106,7 +111,7 @@ public class CommonRest {
                 }
             }
         } finally {
-            etlLock.unlock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
+//            etlLock.unlock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
         }
     }
 

@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.sql.DataSource;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -72,18 +73,18 @@ public class ESEtlService extends AbstractEtlService {
         }
     }
 
-    protected boolean executeSqlImport(DataSource ds, String sql, List<Object> values,
+    protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
                                        AdapterConfig.AdapterMapping adapterMapping, AtomicLong impCount,
                                        List<String> errMsg) {
         try {
             ESMapping mapping = (ESMapping) adapterMapping;
-            Util.sqlRS(ds, sql, values, rs -> {
-                int count = 0;
+            return Util.sqlRS(ds, sql, values, rs -> {
+                Long lastId = 0L;
                 try {
                     ESBulkRequest esBulkRequest = this.esConnection.new ESBulkRequest();
-
                     long batchBegin = System.currentTimeMillis();
                     while (rs.next()) {
+                        lastId = rs.getLong("id");
                         Map<String, Object> esFieldData = new LinkedHashMap<>();
                         Object idVal = null;
                         for (FieldItem fieldItem : mapping.getSchemaItem().getSelectFields().values()) {
@@ -169,20 +170,19 @@ public class ESEtlService extends AbstractEtlService {
                             long esBatchBegin = System.currentTimeMillis();
                             BulkResponse rp = esBulkRequest.bulk();
                             if (rp.hasFailures()) {
+                                logger.error("has failures response:{}", JSON.toJSONString(rp));
                                 this.processFailBulkResponse(rp);
                             }
 
-                            if (logger.isTraceEnabled()) {
-                                logger.trace("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}",
-                                    (System.currentTimeMillis() - batchBegin),
-                                    (System.currentTimeMillis() - esBatchBegin),
-                                    esBulkRequest.numberOfActions(),
-                                    mapping.get_index());
-                            }
+                            logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index: {}, lastId:{}",
+                                (System.currentTimeMillis() - batchBegin),
+                                (System.currentTimeMillis() - esBatchBegin),
+                                esBulkRequest.numberOfActions(),
+                                mapping.get_index(),
+                                lastId);
                             batchBegin = System.currentTimeMillis();
                             esBulkRequest.resetBulk();
                         }
-                        count++;
                         impCount.incrementAndGet();
                     }
 
@@ -192,26 +192,24 @@ public class ESEtlService extends AbstractEtlService {
                         if (rp.hasFailures()) {
                             this.processFailBulkResponse(rp);
                         }
-                        if (logger.isTraceEnabled()) {
-                            logger.trace("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}",
-                                (System.currentTimeMillis() - batchBegin),
-                                (System.currentTimeMillis() - esBatchBegin),
-                                esBulkRequest.numberOfActions(),
-                                mapping.get_index());
-                        }
+                        logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, lastId:{}",
+                            (System.currentTimeMillis() - batchBegin),
+                            (System.currentTimeMillis() - esBatchBegin),
+                            esBulkRequest.numberOfActions(),
+                            mapping.get_index(),
+                            lastId);
                     }
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                     errMsg.add(mapping.get_index() + " etl failed! ==>" + e.getMessage());
                     throw new RuntimeException(e);
                 }
-                return count;
+                return lastId;
             });
 
-            return true;
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return false;
+            return 0L;
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.alibaba.otter.canal.client.adapter.support;
 
 import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.fastjson.JSON;
 import com.google.common.base.Joiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,8 +9,6 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractEtlService {
@@ -39,11 +38,13 @@ public abstract class AbstractEtlService {
         try {
             DruidDataSource dataSource = DatasourceConfig.DATA_SOURCES.get(config.getDataSourceKey());
 
+
+            Long startId = Long.valueOf(params.get(0));
+            Long endId = Long.valueOf(params.get(1));
             List<Object> values = new ArrayList<>();
             // 拼接条件
             if (config.getMapping().getEtlCondition() != null && params != null) {
                 String etlCondition = config.getMapping().getEtlCondition();
-                int size = params.size();
                 for (String param : params) {
                     etlCondition = etlCondition.replace("{}", "?");
                     values.add(param);
@@ -72,30 +73,15 @@ public abstract class AbstractEtlService {
 
             // 当大于1万条记录时开启多线程
             if (cnt >= 10000) {
-                int threadCount = Runtime.getRuntime().availableProcessors();
 
-                long offset;
                 long size = CNT_PER_TASK;
-                long workerCnt = cnt / size + (cnt % size == 0 ? 0 : 1);
 
-                if (logger.isDebugEnabled()) {
-                    logger.debug("workerCnt {} for cnt {} threadCount {}", workerCnt, cnt, threadCount);
+                while(endId > startId) {
+                    String sqlFinal = sql + " LIMIT " + size;
+                    startId = (Long) executeSqlImport(dataSource, sqlFinal, values, config.getMapping(), impCount, errMsg);
+                    values.remove(0);
+                    values.add(0, startId);
                 }
-
-                ExecutorService executor = Util.newFixedThreadPool(threadCount, 5000L);
-                List<Future<Boolean>> futures = new ArrayList<>();
-                for (long i = 0; i < workerCnt; i++) {
-                    offset = size * i;
-                    String sqlFinal = sql + " LIMIT " + offset + "," + size;
-                    Future<Boolean> future = executor.submit(
-                        () -> executeSqlImport(dataSource, sqlFinal, values, config.getMapping(), impCount, errMsg));
-                    futures.add(future);
-                }
-
-                for (Future<Boolean> future : futures) {
-                    future.get();
-                }
-                executor.shutdown();
             } else {
                 executeSqlImport(dataSource, sql, values, config.getMapping(), impCount, errMsg);
             }
@@ -104,7 +90,7 @@ public abstract class AbstractEtlService {
             etlResult.setResultMessage("导入" + type + " 数据：" + impCount.get() + " 条");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            errMsg.add(type + " 数据导入异常 =>" + e.getMessage());
+            errMsg.add(type + " 数据导入异常 =>" + e.getMessage() + "," + JSON.toJSONString(errMsg));
         }
         if (errMsg.isEmpty()) {
             etlResult.setSucceeded(true);
@@ -114,7 +100,7 @@ public abstract class AbstractEtlService {
         return etlResult;
     }
 
-    protected abstract boolean executeSqlImport(DataSource ds, String sql, List<Object> values,
+    protected abstract Object executeSqlImport(DataSource ds, String sql, List<Object> values,
                                                 AdapterConfig.AdapterMapping mapping, AtomicLong impCount,
                                                 List<String> errMsg);
 
