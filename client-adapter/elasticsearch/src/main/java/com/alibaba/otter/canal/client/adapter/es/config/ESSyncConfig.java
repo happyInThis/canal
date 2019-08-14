@@ -89,6 +89,7 @@ public class ESSyncConfig implements AdapterConfig {
         private String                       _index;
         private String                       _type;
         private String                       _id;
+        private String                       routing;
         private boolean                      upsert          = false;
         private String                       pk;
         private Map<String, RelationMapping> relations       = new LinkedHashMap<>();
@@ -126,6 +127,14 @@ public class ESSyncConfig implements AdapterConfig {
 
         public void set_id(String _id) {
             this._id = _id;
+        }
+
+        public String getRouting() {
+            return routing;
+        }
+
+        public void setRouting(String routing) {
+            this.routing = routing;
         }
 
         public boolean isUpsert() {
@@ -221,7 +230,6 @@ public class ESSyncConfig implements AdapterConfig {
 
         private String name;
         private String parent;
-        private String routing;
 
         public String getName() {
             return name;
@@ -237,14 +245,6 @@ public class ESSyncConfig implements AdapterConfig {
 
         public void setParent(String parent) {
             this.parent = parent;
-        }
-
-        public String getRouting() {
-            return routing;
-        }
-
-        public void setRouting(String routing) {
-            this.routing = routing;
         }
     }
 }

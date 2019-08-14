@@ -98,11 +98,26 @@ public class ESEtlService extends AbstractEtlService {
                         // 如果是主键字段则不插入
                         if (fieldItem.getFieldName().equals(mapping.get_id())) {
                             idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
+                        } if(fieldItem.getFieldName().equals(mapping.getRouting())) {
+                            FieldItem routingFieldItem = mapping.getSchemaItem()
+                                    .getSelectFields()
+                                    .get(mapping.getRouting());
+                            Object routingVal;
+                            try {
+                                routingVal = esTemplate.getValFromRS(mapping,
+                                        rs,
+                                        routingFieldItem.getFieldName(),
+                                        routingFieldItem.getFieldName());
+                            } catch (SQLException e) {
+                                throw new RuntimeException(e);
+                            }
+                            if (routingVal != null) {
+                                esFieldData.put("$routing", routingVal.toString());
+                            }
                         } else {
                             Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
                             esFieldData.put(Util.cleanColumn(fieldName), val);
                         }
-
                     }
 
                     if (!mapping.getRelations().isEmpty()) {
@@ -128,23 +143,7 @@ public class ESEtlService extends AbstractEtlService {
 
                                 }
                             }
-                            if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
-                                FieldItem routingFieldItem = mapping.getSchemaItem()
-                                    .getSelectFields()
-                                    .get(relationMapping.getRouting());
-                                Object routingVal;
-                                try {
-                                    routingVal = esTemplate.getValFromRS(mapping,
-                                        rs,
-                                        routingFieldItem.getFieldName(),
-                                        routingFieldItem.getFieldName());
-                                } catch (SQLException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                if (routingVal != null) {
-                                    esFieldData.put("$routing", routingVal.toString());
-                                }
-                            }
+
                             esFieldData.put(Util.cleanColumn(relationField), relations);
                         });
                     }

@@ -294,6 +294,7 @@ public class ESTemplate {
                                   Map<String, Object> esFieldData) throws SQLException {
         SchemaItem schemaItem = mapping.getSchemaItem();
         String idFieldName = mapping.get_id() == null ? mapping.getPk() : mapping.get_id();
+        String routingFieldName = mapping.getRouting();
         Object resultIdVal = null;
         for (FieldItem fieldItem : schemaItem.getSelectFields().values()) {
             Object value = getValFromRS(mapping, resultSet, fieldItem.getFieldName(), fieldItem.getFieldName());
@@ -305,6 +306,21 @@ public class ESTemplate {
             if (!fieldItem.getFieldName().equals(mapping.get_id())
                     && !mapping.getSkips().contains(fieldItem.getFieldName())) {
                 esFieldData.put(Util.cleanColumn(fieldItem.getFieldName()), value);
+            }
+            if (StringUtils.isNotEmpty(routingFieldName)) {
+                FieldItem routingFieldItem = schemaItem.getSelectFields().get(routingFieldName);
+                Object routingVal;
+                try {
+                    routingVal = getValFromRS(mapping,
+                            resultSet,
+                            routingFieldItem.getFieldName(),
+                            routingFieldItem.getFieldName());
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+                if (routingVal != null) {
+                    esFieldData.put("$routing", routingVal.toString());
+                }
             }
         }
 
@@ -333,12 +349,28 @@ public class ESTemplate {
                                   Map<String, Object> esFieldData) throws SQLException {
         SchemaItem schemaItem = mapping.getSchemaItem();
         String idFieldName = mapping.get_id() == null ? mapping.getPk() : mapping.get_id();
+        String routingFieldName = mapping.getRouting();
         Object resultIdVal = null;
         for (FieldItem fieldItem : schemaItem.getSelectFields().values()) {
             if (fieldItem.getFieldName().equals(idFieldName)) {
                 resultIdVal = getValFromRS(mapping, resultSet, fieldItem.getFieldName(), fieldItem.getFieldName());
             }
 
+            if (StringUtils.isNotEmpty(routingFieldName)) {
+                FieldItem routingFieldItem = schemaItem.getSelectFields().get(routingFieldName);
+                Object routingVal;
+                try {
+                    routingVal = getValFromRS(mapping,
+                            resultSet,
+                            routingFieldItem.getFieldName(),
+                            routingFieldItem.getFieldName());
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+                if (routingVal != null) {
+                    esFieldData.put("$routing", routingVal.toString());
+                }
+            }
             for (ColumnItem columnItem : fieldItem.getColumnItems()) {
                 if (dmlOld.containsKey(columnItem.getColumnName())
                         && !mapping.getSkips().contains(fieldItem.getFieldName())) {
@@ -397,6 +429,17 @@ public class ESTemplate {
                     && !mapping.getSkips().contains(fieldItem.getFieldName())) {
                 esFieldData.put(Util.cleanColumn(fieldItem.getFieldName()), value);
             }
+            if (StringUtils.isNotEmpty(mapping.getRouting())) {
+                FieldItem routingFieldItem = schemaItem.getSelectFields().get(mapping.getRouting());
+                Object routingVal;
+                routingVal = getValFromData(mapping,
+                        dmlData,
+                        routingFieldItem.getFieldName(),
+                        routingFieldItem.getFieldName());
+                if (routingVal != null) {
+                    esFieldData.put("$routing", routingVal.toString());
+                }
+            }
         }
 
         // 添加父子文档关联信息
@@ -427,6 +470,18 @@ public class ESTemplate {
             if (dmlOld.containsKey(columnName) && !mapping.getSkips().contains(fieldItem.getFieldName())) {
                 esFieldData.put(Util.cleanColumn(fieldItem.getFieldName()),
                         getValFromData(mapping, dmlData, fieldItem.getFieldName(), columnName));
+            }
+
+            if (StringUtils.isNotEmpty(mapping.getRouting())) {
+                FieldItem routingFieldItem = schemaItem.getSelectFields().get(mapping.getRouting());
+                Object routingVal;
+                    routingVal = getValFromData(mapping,
+                            dmlData,
+                            routingFieldItem.getFieldName(),
+                            routingFieldItem.getFieldName());
+                if (routingVal != null) {
+                    esFieldData.put("$routing", routingVal.toString());
+                }
             }
         }
 
@@ -459,21 +514,6 @@ public class ESTemplate {
 
                     }
                 }
-                if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
-                    FieldItem routingFieldItem = schemaItem.getSelectFields().get(relationMapping.getRouting());
-                    Object routingVal;
-                    try {
-                        routingVal = getValFromRS(mapping,
-                                resultSet,
-                                routingFieldItem.getFieldName(),
-                                routingFieldItem.getFieldName());
-                    } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                    }
-                    if (routingVal != null) {
-                        esFieldData.put("$routing", routingVal.toString());
-                    }
-                }
                 esFieldData.put(relationField, relations);
             });
         }
@@ -494,14 +534,6 @@ public class ESTemplate {
                         relations.put("parent", parentVal.toString());
                         esFieldData.put("$parent_routing", parentVal.toString());
 
-                    }
-                }
-                if (StringUtils.isNotEmpty(relationMapping.getRouting())) {
-                    FieldItem routingFieldItem = schemaItem.getSelectFields().get(relationMapping.getRouting());
-                    String columnName = routingFieldItem.getColumnItems().iterator().next().getColumnName();
-                    Object routingVal = getValFromData(mapping, dmlData, routingFieldItem.getFieldName(), columnName);
-                    if (routingVal != null) {
-                        esFieldData.put("$routing", routingVal.toString());
                     }
                 }
                 esFieldData.put(relationField, relations);
