@@ -88,6 +88,7 @@ public class ESEtlService extends AbstractEtlService {
                     count += 1;
                     Map<String, Object> esFieldData = new LinkedHashMap<>();
                     Object idVal = null;
+                    Object routingVal = null;
                     for (FieldItem fieldItem : mapping.getSchemaItem().getSelectFields().values()) {
 
                         String fieldName = fieldItem.getFieldName();
@@ -98,21 +99,12 @@ public class ESEtlService extends AbstractEtlService {
                         // 如果是主键字段则不插入
                         if (fieldItem.getFieldName().equals(mapping.get_id())) {
                             idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
-                        } if(fieldItem.getFieldName().equals(mapping.getRouting())) {
-                            FieldItem routingFieldItem = mapping.getSchemaItem()
-                                    .getSelectFields()
-                                    .get(mapping.getRouting());
-                            Object routingVal;
+                        } else if(fieldItem.getFieldName().equals(mapping.getRouting())) {
                             try {
-                                routingVal = esTemplate.getValFromRS(mapping,
-                                        rs,
-                                        routingFieldItem.getFieldName(),
-                                        routingFieldItem.getFieldName());
+                                routingVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
+                                esFieldData.put(Util.cleanColumn(fieldName), routingVal);
                             } catch (SQLException e) {
                                 throw new RuntimeException(e);
-                            }
-                            if (routingVal != null) {
-                                esFieldData.put("$routing", routingVal.toString());
                             }
                         } else {
                             Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
@@ -150,15 +142,14 @@ public class ESEtlService extends AbstractEtlService {
 
                     if (idVal != null) {
                         String parentVal = (String) esFieldData.remove("$parent_routing");
-                        String routingVal = (String) esFieldData.remove("$routing");
                         if (mapping.isUpsert()) {
                             ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(
                                 mapping.get_index(),
                                 mapping.get_type(),
                                 idVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
 
-                            if (StringUtils.isNotEmpty(routingVal)) {
-                                esUpdateRequest.setRouting(routingVal);
+                            if (routingVal != null) {
+                                esUpdateRequest.setRouting(routingVal.toString());
                             }
                             if (StringUtils.isNotEmpty(parentVal)) {
                                 esUpdateRequest.setRouting(parentVal);
@@ -168,8 +159,8 @@ public class ESEtlService extends AbstractEtlService {
                         } else {
                             ESIndexRequest esIndexRequest = this.esConnection.new ESIndexRequest(mapping
                                 .get_index(), mapping.get_type(), idVal.toString()).setSource(esFieldData);
-                            if (StringUtils.isNotEmpty(routingVal)) {
-                                esIndexRequest.setRouting(routingVal);
+                            if (routingVal != null) {
+                                esIndexRequest.setRouting(routingVal.toString());
                             }
                             if (StringUtils.isNotEmpty(parentVal)) {
                                 esIndexRequest.setRouting(parentVal);
