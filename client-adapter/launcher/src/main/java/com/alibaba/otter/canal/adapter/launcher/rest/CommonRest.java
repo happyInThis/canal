@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
@@ -40,7 +39,7 @@ public class CommonRest {
     private static Logger                 logger           = LoggerFactory.getLogger(CommonRest.class);
 
     private static final String           ETL_LOCK_ZK_NODE = "/sync-etl/";
-    private static AtomicInteger count = new AtomicInteger(0);
+
     private ExtensionLoader<OuterAdapter> loader;
 
     @Resource
@@ -69,18 +68,17 @@ public class CommonRest {
                          @RequestParam(name = "params", required = false) String params) {
         OuterAdapter adapter = loader.getExtension(type, key);
         String destination = adapter.getDestination(task);
-//        String lockKey = destination == null ? task : destination;
-//
-//        boolean locked = etlLock.tryLock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
-//        if (!locked) {
-//            EtlResult result = new EtlResult();
-//            result.setSucceeded(false);
-//            result.setErrorMessage(task + " 有其他进程正在导入中, 请稍后再试");
-//            return result;
-//        }
+        String lockKey = destination == null ? task : destination;
+
+        boolean locked = etlLock.tryLock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
+        if (!locked) {
+            EtlResult result = new EtlResult();
+            result.setSucceeded(false);
+            result.setErrorMessage(task + " 有其他进程正在导入中, 请稍后再试");
+            return result;
+        }
         try {
-            //统计发起的次数
-            count.addAndGet(1);
+
             boolean oriSwitchStatus;
             if (destination != null) {
                 oriSwitchStatus = syncSwitch.status(destination);
@@ -100,23 +98,15 @@ public class CommonRest {
                     paramArray = Arrays.asList(params.trim().split(";"));
                 }
                 return adapter.etl(task, paramArray);
-            } catch(Exception e) {
-                EtlResult result = new EtlResult();
-                result.setSucceeded(false);
-                result.setErrorMessage(e.getMessage());
-                return result;
             } finally {
-                int i = count.decrementAndGet();
-                if(i <= 0) {
-                    if(destination != null && oriSwitchStatus) {
-                        syncSwitch.on(destination);
-                    } else if(destination == null && oriSwitchStatus) {
-                        syncSwitch.on(task);
-                    }
+                if (destination != null && oriSwitchStatus) {
+                    syncSwitch.on(destination);
+                } else if (destination == null && oriSwitchStatus) {
+                    syncSwitch.on(task);
                 }
             }
         } finally {
-//            etlLock.unlock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
+            etlLock.unlock(ETL_LOCK_ZK_NODE + type + "-" + lockKey);
         }
     }
 

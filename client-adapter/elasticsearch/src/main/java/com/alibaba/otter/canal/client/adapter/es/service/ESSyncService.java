@@ -4,6 +4,7 @@ import java.util.*;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,9 +73,9 @@ public class ESSyncService {
                 StringBuilder configIndexes = new StringBuilder();
                 esSyncConfigs
                     .forEach(esSyncConfig -> configIndexes.append(esSyncConfig.getEsMapping().get_index()).append(" "));
-                logger.debug("DML: {} \nAffected indexes: {}",
+                logger.debug("DML: {} \nAffected indexes: {},delay:{}",
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
-                    configIndexes.toString());
+                    configIndexes.toString(), (System.currentTimeMillis() - dml.getTs()));
             }
         }
     }
@@ -603,7 +604,17 @@ public class ESSyncService {
             try {
                 while (rs.next()) {
                     Map<String, Object> esFieldData = new LinkedHashMap<>();
-
+                    if (StringUtils.isNotEmpty(config.getEsMapping().getRouting())) {
+                        FieldItem routingFieldItem = tableItem.getSchemaItem().getSelectFields().get(config.getEsMapping().getRouting());
+                        Object routingVal;
+                        routingVal = esTemplate.getValFromData(config.getEsMapping(),
+                                data,
+                                routingFieldItem.getFieldName(),
+                                routingFieldItem.getFieldName());
+                        if (routingVal != null) {
+                            esFieldData.put("$routing", routingVal.toString());
+                        }
+                    }
                     for (FieldItem fieldItem : tableItem.getRelationSelectFieldItems()) {
                         if (old != null) {
                             out: for (FieldItem fieldItem1 : tableItem.getSubQueryFields()) {

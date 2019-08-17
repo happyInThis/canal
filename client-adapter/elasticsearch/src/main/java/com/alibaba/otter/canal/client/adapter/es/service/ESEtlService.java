@@ -78,7 +78,7 @@ public class ESEtlService extends AbstractEtlService {
                                        List<String> errMsg) {
         ESMapping mapping = (ESMapping) adapterMapping;
         return Util.sqlRS(ds, sql, values, rs -> {
-            Long lastId = 0L;
+            Long lastId = null;
             int count = 0;
             try {
                 ESBulkRequest esBulkRequest = this.esConnection.new ESBulkRequest();
@@ -188,11 +188,12 @@ public class ESEtlService extends AbstractEtlService {
                             this.processFailBulkResponse(rp);
                         }
 
-                        logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index: {}, lastId:{}",
+                        logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index: {}, firstId:{}, lastId:{}",
                             (System.currentTimeMillis() - batchBegin),
                             (System.currentTimeMillis() - esBatchBegin),
                             esBulkRequest.numberOfActions(),
                             mapping.get_index(),
+                            values.get(0),
                             lastId);
                         batchBegin = System.currentTimeMillis();
                         esBulkRequest.resetBulk();
@@ -206,11 +207,12 @@ public class ESEtlService extends AbstractEtlService {
                     if (rp.hasFailures()) {
                         this.processFailBulkResponse(rp);
                     }
-                    logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, lastId:{}",
+                    logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, firstId:{}, lastId:{}",
                         (System.currentTimeMillis() - batchBegin),
                         (System.currentTimeMillis() - esBatchBegin),
                         esBulkRequest.numberOfActions(),
                         mapping.get_index(),
+                        values.get(0),
                         lastId);
                 }
             } catch (Exception e) {
@@ -219,7 +221,6 @@ public class ESEtlService extends AbstractEtlService {
                 throw new RuntimeException(e);
             }
             Map result = new HashMap();
-            result.put("lastId", lastId);
             result.put("count", count);
             return result;
         });

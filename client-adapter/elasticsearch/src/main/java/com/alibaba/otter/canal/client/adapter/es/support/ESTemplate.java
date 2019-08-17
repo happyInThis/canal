@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import javax.sql.DataSource;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -154,6 +155,13 @@ public class ESTemplate {
             try {
                 while (rs.next()) {
                     Object idVal = getIdValFromRS(mapping, rs);
+                    if (StringUtils.isNotEmpty(config.getEsMapping().getRouting())) {
+                        Object routingVal;
+                        routingVal = getValFromRS(mapping, rs, mapping.getRouting(), mapping.getRouting());
+                        if (routingVal != null) {
+                            esFieldData.put("$routing", routingVal.toString());
+                        }
+                    }
                     append4Update(mapping, idVal, esFieldData);
                     commitBulk();
                     count++;
@@ -230,29 +238,30 @@ public class ESTemplate {
     }
 
     private void append4Update(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
+        logger.info("update data pkVal:{}, esFieldData:{}", pkVal, JSON.toJSONString(esFieldData));
+        String routingVal = (String) esFieldData.remove("$routing");
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");
-            String routingVal = (String) esFieldData.remove("$routing");
             if (mapping.isUpsert()) {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setDoc(esFieldData).setDocAsUpsert(true);
-                if (StringUtils.isNotEmpty(routingVal)) {
-                    esUpdateRequest.setRouting(routingVal);
-                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     esUpdateRequest.setRouting(parentVal);
+                }
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
                 }
                 getBulk().add(esUpdateRequest);
             } else {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         pkVal.toString()).setDoc(esFieldData);
-                if (StringUtils.isNotEmpty(routingVal)) {
-                    esUpdateRequest.setRouting(routingVal);
-                }
                 if (StringUtils.isNotEmpty(parentVal)) {
                     esUpdateRequest.setRouting(parentVal);
+                }
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
                 }
                 getBulk().add(esUpdateRequest);
             }
@@ -264,6 +273,9 @@ public class ESTemplate {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         hit.getId()).setDoc(esFieldData);
+                if (StringUtils.isNotEmpty(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
+                }
                 getBulk().add(esUpdateRequest);
             }
         }

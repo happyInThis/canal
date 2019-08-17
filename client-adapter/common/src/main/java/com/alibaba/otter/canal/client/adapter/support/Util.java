@@ -16,6 +16,7 @@ import java.util.function.Function;
 
 import javax.sql.DataSource;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -47,6 +48,7 @@ public class Util {
     }
 
     public static Object sqlRS(DataSource ds, String sql, List<Object> values, Function<ResultSet, Object> fun) {
+        logger.info("sqlRS sql:{},params:{}", sql, JSON.toJSONString(values));
         try (Connection conn = ds.getConnection()) {
             try (PreparedStatement pstmt = conn
                 .prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
