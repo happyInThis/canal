@@ -467,7 +467,7 @@ public class ESTemplate {
      * @param esFieldData es data
      * @return 返回 id 值
      */
-    public Object getESDataFromDmlData(ESMapping mapping, Map<String, Object> dmlData, Map<String, Object> dmlOld,
+    public Object getESDataFromDmlData(ESMapping mapping, Map<String, Object> dmlData, Map<String, Object> dmlOld, String tableName,
                                        Map<String, Object> esFieldData) {
         SchemaItem schemaItem = mapping.getSchemaItem();
         String idFieldName = mapping.get_id() == null ? mapping.getPk() : mapping.get_id();
@@ -478,25 +478,25 @@ public class ESTemplate {
             if (fieldItem.getFieldName().equals(idFieldName)) {
                 resultIdVal = getValFromData(mapping, dmlData, fieldItem.getFieldName(), columnName);
             }
-
-            if (dmlOld.containsKey(columnName) && !mapping.getSkips().contains(fieldItem.getFieldName())) {
+            if (dmlOld.containsKey(columnName) && !mapping.getSkips().contains(fieldItem.getFieldName()) &&
+                    mapping.getSchemaItem().getAliasTableItems().get(fieldItem.getOwner()).getTableName().equals(tableName)) {
                 esFieldData.put(Util.cleanColumn(fieldItem.getFieldName()),
                         getValFromData(mapping, dmlData, fieldItem.getFieldName(), columnName));
             }
 
-            if (StringUtils.isNotEmpty(mapping.getRouting())) {
-                FieldItem routingFieldItem = schemaItem.getSelectFields().get(mapping.getRouting());
-                Object routingVal;
-                    routingVal = getValFromData(mapping,
-                            dmlData,
-                            routingFieldItem.getFieldName(),
-                            routingFieldItem.getFieldName());
-                if (routingVal != null) {
-                    esFieldData.put("$routing", routingVal.toString());
-                }
-            }
         }
 
+        if (StringUtils.isNotEmpty(mapping.getRouting())) {
+            FieldItem routingFieldItem = schemaItem.getSelectFields().get(mapping.getRouting());
+            Object routingVal;
+            routingVal = getValFromData(mapping,
+                    dmlData,
+                    routingFieldItem.getFieldName(),
+                    routingFieldItem.getFieldName());
+            if (routingVal != null) {
+                esFieldData.put("$routing", routingVal.toString());
+            }
+        }
         // 添加父子文档关联信息
         putRelationData(mapping, schemaItem, dmlOld, esFieldData);
         return resultIdVal;

@@ -63,7 +63,7 @@ public abstract class AbstractEtlService {
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                 }
-                return id == null ? 0L : id;
+                return id == null ? 0L : id - 1;
             });
             String endIdSql = sql + " order by id desc limit 1";
             Long endId = (Long) Util.sqlRS(dataSource, endIdSql, values, rs -> {

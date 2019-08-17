@@ -801,7 +801,7 @@ public class ESSyncService {
         ESMapping mapping = config.getEsMapping();
         Map<String, Object> esFieldData = new LinkedHashMap<>();
 
-        Object idVal = esTemplate.getESDataFromDmlData(mapping, data, old, esFieldData);
+        Object idVal = esTemplate.getESDataFromDmlData(mapping, data, old, dml.getTable(), esFieldData);
 
         if (logger.isTraceEnabled()) {
             logger.trace("Main table update to es index, destination:{}, table: {}, index: {}, id: {}",
