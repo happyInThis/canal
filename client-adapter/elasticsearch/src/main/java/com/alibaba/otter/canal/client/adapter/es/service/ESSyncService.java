@@ -99,17 +99,21 @@ public class ESSyncService {
             } else {
                 return;
             }
-
+            long delay = (System.currentTimeMillis() - dml.getEs());
             if (logger.isDebugEnabled()) {
-                logger.debug("Sync elapsed time: {} ms,destination: {}, dml: {}, es index: {}, delay: {}",
+                logger.debug("Sync elapsed time: {} ms , delay: {} ms,destination: {}, dml: {}, es index: {}",
                     (System.currentTimeMillis() - begin),
+                    delay,
                     dml.getDestination(),
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
-                    config.getEsMapping().get_index(),
-                        (System.currentTimeMillis() - dml.getEs()));
+                    config.getEsMapping().get_index());
+            }
+            if(delay > 1000) {
+                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. dml:" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
+            Util.sendWarnMsg("同步失败：" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
             throw new RuntimeException(e);
         }
     }

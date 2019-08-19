@@ -238,7 +238,6 @@ public class ESTemplate {
     }
 
     private void append4Update(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
-        logger.info("update data pkVal:{}, esFieldData:{}", pkVal, JSON.toJSONString(esFieldData));
         String routingVal = (String) esFieldData.remove("$routing");
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");

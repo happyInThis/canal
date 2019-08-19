@@ -72,6 +72,7 @@ public abstract class AbstractCanalAdapterWorker {
                     return true;
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
+                    Util.sendWarnMsg(canalDestination + "处理失败：" + e.getMessage());
                     return false;
                 }
             }));

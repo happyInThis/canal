@@ -28,6 +28,8 @@ public class CanalClientConfig {
     private Integer            retries;
     // 消费超时时间
     private Long               timeout;
+    // 延迟告警时间
+    private Long               delayTime;
     // 模式 tcp kafka rocketMQ
     private String             mode          = "tcp";
     // aliyun ak/sk
@@ -106,6 +108,14 @@ public class CanalClientConfig {
 
     public void setTimeout(Long timeout) {
         this.timeout = timeout;
+    }
+
+    public Long getDelayTime() {
+        return delayTime;
+    }
+
+    public void setDelayTime(Long delayTime) {
+        this.delayTime = delayTime;
     }
 
     public String getMode() {

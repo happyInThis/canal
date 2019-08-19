@@ -5,6 +5,7 @@ import java.net.URL;
 import java.sql.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -16,8 +17,11 @@ import java.util.function.Function;
 
 import javax.sql.DataSource;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.otter.canal.client.adapter.util.HttpClientUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.http.Header;
+import org.apache.http.message.BasicHeader;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -288,5 +292,22 @@ public class Util {
         }
 
         return null;
+    }
+
+    /**
+     * 发送告警消息
+     * @param msg
+     */
+    public static void sendWarnMsg(String msg){
+        JSONObject jsonObject = new JSONObject();
+        JSONObject dataObject = new JSONObject();
+        dataObject.put("title", "canal告警");
+        dataObject.put("text", "## [canal告警]增量同步异常告警\n" +
+                "> [内容] " + msg);
+        jsonObject.put("msgtype", "markdown");
+        jsonObject.put("markdown", dataObject);
+        Header header = new BasicHeader("Content-Type", "application/json");
+        String s = HttpClientUtils.getInstance().postWithData("https://oapi.dingtalk.com/robot/send?access_token=543cb65c3fca9f032966a914a8488e1c5a474b649b94d15e927967db215e1b37", Arrays.asList(header), null, jsonObject.toJSONString().getBytes());
+        System.out.println(s);
     }
 }

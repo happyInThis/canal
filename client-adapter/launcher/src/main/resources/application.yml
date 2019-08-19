@@ -18,6 +18,7 @@ canal.conf:
   timeout:
   accessKey:
   secretKey:
+  delay: 1000
 #  srcDataSources:
 #    defaultDS:
 #      url: jdbc:mysql://127.0.0.1:3306/mytest?useUnicode=true
