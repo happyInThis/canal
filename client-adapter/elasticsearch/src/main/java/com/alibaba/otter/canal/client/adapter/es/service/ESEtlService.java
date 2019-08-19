@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import javax.sql.DataSource;
 
@@ -74,7 +75,7 @@ public class ESEtlService extends AbstractEtlService {
     }
 
     protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping adapterMapping, AtomicLong impCount,
+                                       AdapterConfig.AdapterMapping adapterMapping, LongAdder impCount,
                                        List<String> errMsg) {
         ESMapping mapping = (ESMapping) adapterMapping;
         return Util.sqlRS(ds, sql, values, rs -> {
@@ -198,7 +199,7 @@ public class ESEtlService extends AbstractEtlService {
                         batchBegin = System.currentTimeMillis();
                         esBulkRequest.resetBulk();
                     }
-                    impCount.incrementAndGet();
+                    impCount.increment();
                 }
 
                 if (esBulkRequest.numberOfActions() > 0) {

@@ -7,7 +7,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import javax.sql.DataSource;
 
@@ -94,7 +94,7 @@ public class HbaseEtlService extends AbstractEtlService {
      * 执行导入
      */
     protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping mapping, AtomicLong impCount, List<String> errMsg) {
+                                       AdapterConfig.AdapterMapping mapping, LongAdder impCount, List<String> errMsg) {
         MappingConfig.HbaseMapping hbaseMapping = (MappingConfig.HbaseMapping) mapping;
         try {
             Util.sqlRS(ds, sql, values, rs -> {
@@ -243,9 +243,9 @@ public class HbaseEtlService extends AbstractEtlService {
                             complete = true;
                         }
                         i++;
-                        impCount.incrementAndGet();
+                        impCount.increment();
                         if (logger.isDebugEnabled()) {
-                            logger.debug("successful import count:" + impCount.get());
+                            logger.debug("successful import count:" + impCount.longValue());
                         }
                     }
 

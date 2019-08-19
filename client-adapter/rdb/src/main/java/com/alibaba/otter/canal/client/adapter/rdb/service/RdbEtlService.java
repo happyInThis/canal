@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import javax.sql.DataSource;
 
@@ -47,7 +47,7 @@ public class RdbEtlService extends AbstractEtlService {
      * 执行导入
      */
     protected Object executeSqlImport(DataSource srcDS, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping mapping, AtomicLong impCount, List<String> errMsg) {
+                                       AdapterConfig.AdapterMapping mapping, LongAdder impCount, List<String> errMsg) {
         try {
             DbMapping dbMapping = (DbMapping) mapping;
             Map<String, String> columnsMap = new LinkedHashMap<>();
@@ -143,9 +143,9 @@ public class RdbEtlService extends AbstractEtlService {
                                 completed = true;
                             }
                             idx++;
-                            impCount.incrementAndGet();
+                            impCount.increment();
                             if (logger.isDebugEnabled()) {
-                                logger.debug("successful import count:" + impCount.get());
+                                logger.debug("successful import count:" + impCount.longValue());
                             }
                         }
                         if (!completed) {

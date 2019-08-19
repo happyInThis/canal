@@ -73,9 +73,9 @@ public class ESSyncService {
                 StringBuilder configIndexes = new StringBuilder();
                 esSyncConfigs
                     .forEach(esSyncConfig -> configIndexes.append(esSyncConfig.getEsMapping().get_index()).append(" "));
-                logger.debug("DML: {} \nAffected indexes: {},delay:{}",
+                logger.debug("DML: {} \nAffected indexes: {}",
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
-                    configIndexes.toString(), (System.currentTimeMillis() - dml.getTs()));
+                    configIndexes.toString());
             }
         }
     }
@@ -100,11 +100,13 @@ public class ESSyncService {
                 return;
             }
 
-            if (logger.isTraceEnabled()) {
-                logger.trace("Sync elapsed time: {} ms,destination: {}, es index: {}",
+            if (logger.isDebugEnabled()) {
+                logger.debug("Sync elapsed time: {} ms,destination: {}, dml: {}, es index: {}, delay: {}",
                     (System.currentTimeMillis() - begin),
                     dml.getDestination(),
-                    config.getEsMapping().get_index());
+                    JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
+                    config.getEsMapping().get_index(),
+                        (System.currentTimeMillis() - dml.getEs()));
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);

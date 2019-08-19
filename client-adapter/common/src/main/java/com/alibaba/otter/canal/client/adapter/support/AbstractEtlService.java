@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 public abstract class AbstractEtlService {
 
@@ -30,7 +30,7 @@ public abstract class AbstractEtlService {
 
     protected EtlResult importData(String sql, List<String> params) {
         EtlResult etlResult = new EtlResult();
-        AtomicLong impCount = new AtomicLong();
+        LongAdder impCount = new LongAdder();
         List<String> errMsg = new ArrayList<>();
         if (config == null) {
             logger.warn("{} mapping config is null, etl go end ", type);
@@ -135,8 +135,8 @@ public abstract class AbstractEtlService {
             }
             executor.shutdown();
 
-            logger.info("数据全量导入完成, 一共导入 {} 条数据, 耗时: {}", impCount.get(), System.currentTimeMillis() - startTime);
-            etlResult.setResultMessage("导入" + type + " 数据：" + impCount.get() + " 条");
+            logger.info("数据全量导入完成, 一共导入 {} 条数据, 耗时: {}", impCount.longValue(), System.currentTimeMillis() - startTime);
+            etlResult.setResultMessage("导入" + type + " 数据：" + impCount.longValue() + " 条");
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             errMsg.add(type + " 数据导入异常 =>" + e.getMessage() + "," + JSON.toJSONString(errMsg));
@@ -150,7 +150,7 @@ public abstract class AbstractEtlService {
     }
 
     protected abstract Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                                AdapterConfig.AdapterMapping mapping, AtomicLong impCount,
+                                                AdapterConfig.AdapterMapping mapping, LongAdder impCount,
                                                 List<String> errMsg);
 
 }
