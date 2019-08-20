@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +18,7 @@ import java.util.function.Function;
 
 import javax.sql.DataSource;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.otter.canal.client.adapter.util.HttpClientUtils;
 import org.apache.commons.lang.StringUtils;
@@ -30,10 +32,20 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+@Component
 public class Util {
 
     private static final Logger logger = LoggerFactory.getLogger(Util.class);
+
+    private static String env = "dev";
+
+    @Value("${canal.conf.env}")
+    public void setEnv(String env) {
+        Util.env = env;
+    }
 
     /**
      * 通过DS执行sql
@@ -293,21 +305,33 @@ public class Util {
 
         return null;
     }
-
+    public static final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(100, 100, 30, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(1000));
     /**
      * 发送告警消息
      * @param msg
      */
     public static void sendWarnMsg(String msg){
-        JSONObject jsonObject = new JSONObject();
-        JSONObject dataObject = new JSONObject();
-        dataObject.put("title", "canal告警");
-        dataObject.put("text", "## [canal告警]增量同步异常告警\n" +
-                "> [内容] " + msg);
-        jsonObject.put("msgtype", "markdown");
-        jsonObject.put("markdown", dataObject);
-        Header header = new BasicHeader("Content-Type", "application/json");
-        String s = HttpClientUtils.getInstance().postWithData("https://oapi.dingtalk.com/robot/send?access_token=543cb65c3fca9f032966a914a8488e1c5a474b649b94d15e927967db215e1b37", Arrays.asList(header), null, jsonObject.toJSONString().getBytes());
-        System.out.println(s);
+        if("online".equals(env)) {
+            threadPoolExecutor.execute(() -> {
+                JSONObject jsonObject = new JSONObject();
+                JSONObject dataObject = new JSONObject();
+                dataObject.put("title", "canal告警");
+                dataObject.put("text", "## [canal告警]增量同步异常告警\n" + "> [内容] " + msg);
+                jsonObject.put("msgtype", "markdown");
+                jsonObject.put("markdown", dataObject);
+                Header header = new BasicHeader("Content-Type", "application/json");
+                try {
+                    String result = HttpClientUtils.getInstance().postWithData("https://oapi.dingtalk.com/robot/send?access_token=543cb65c3fca9f032966a914a8488e1c5a474b649b94d15e927967db215e1b37", Arrays.asList(header), null, jsonObject.toJSONString().getBytes());
+                    if(StringUtils.isNotBlank(result)) {
+                        JSONObject jsonObject1 = JSON.parseObject(result);
+                        if(!"ok".equals(jsonObject1.getString("errmsg"))) {
+                            logger.error("sendWarnMsg fail msg:{}, error:{}", msg, jsonObject1.getString("errmsg"));
+                        }
+                    }
+                } catch(Exception e) {
+                    logger.error("sendWarnMsg fail msg:" + msg + ",error:" + e.getMessage(), e);
+                }
+            });
+        }
     }
 }

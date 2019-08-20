@@ -21,6 +21,8 @@ import com.alibaba.otter.canal.client.adapter.es.support.ESTemplate;
 import com.alibaba.otter.canal.client.adapter.support.DatasourceConfig;
 import com.alibaba.otter.canal.client.adapter.support.Dml;
 import com.alibaba.otter.canal.client.adapter.support.Util;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 /**
  * ES 同步 Service
@@ -28,11 +30,15 @@ import com.alibaba.otter.canal.client.adapter.support.Util;
  * @author rewerma 2018-11-01
  * @version 1.0.0
  */
+@Component
 public class ESSyncService {
 
     private static Logger logger = LoggerFactory.getLogger(ESSyncService.class);
 
     private ESTemplate    esTemplate;
+
+    @Value("${canal.conf.delayTime}")
+    private int delayTime = 1000;
 
     public ESSyncService(ESTemplate esTemplate){
         this.esTemplate = esTemplate;
@@ -108,8 +114,8 @@ public class ESSyncService {
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
                     config.getEsMapping().get_index());
             }
-            if(delay > 1000) {
-                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. dml:" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
+            if(delay > delayTime) {
+                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. table:" + dml.getTable() + ",id:" + dml.getData());
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
