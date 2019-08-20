@@ -114,12 +114,15 @@ public class ESSyncService {
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
                     config.getEsMapping().get_index());
             }
-            if(delay > delayTime) {
-                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. table:" + dml.getTable() + ",id:" + dml.getData());
+            if("online".equals(config.getEnv()) && delay > config.getDelayTime()) {
+                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. table:" + dml.getTable() + ",id:" +
+                        esTemplate.getValFromData(config.getEsMapping(), dml.getData().get(0), "id", "id"));
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
-            Util.sendWarnMsg("同步失败：" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
+            if("online".equals(config.getEnv())) {
+                Util.sendWarnMsg("同步失败：" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
+            }
             throw new RuntimeException(e);
         }
     }

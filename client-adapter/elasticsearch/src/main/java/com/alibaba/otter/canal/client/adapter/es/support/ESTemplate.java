@@ -166,7 +166,7 @@ public class ESTemplate {
                     commitBulk();
                     count++;
                 }
-                if(count == 0) {
+                if("online".equals(config.getEnv()) && count == 0) {
                     Util.sendWarnMsg("查询无数据,sql:" + sql + ",values:" + JSON.toJSONString(values));
                 }
             } catch (Exception e) {

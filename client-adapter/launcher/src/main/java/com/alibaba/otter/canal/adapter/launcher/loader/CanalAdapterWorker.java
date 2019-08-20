@@ -111,20 +111,16 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
                             if (batchId == -1 || size == 0) {
                                 Thread.sleep(500);
                             } else {
-                                if (logger.isDebugEnabled()) {
-                                    logger.debug("destination: {} batchId: {} batchSize: {} ",
-                                        canalDestination,
-                                        batchId,
-                                        size);
-                                }
+                                logger.info("destination: {} batchId: {} batchSize: {} ",
+                                    canalDestination,
+                                    batchId,
+                                    size);
                                 long begin = System.currentTimeMillis();
                                 writeOut(message);
-                                if (logger.isDebugEnabled()) {
-                                    logger.debug("destination: {} batchId: {} elapsed time: {} ms",
-                                        canalDestination,
-                                        batchId,
-                                        System.currentTimeMillis() - begin);
-                                }
+                                logger.info("destination: {} batchId: {} elapsed time: {} ms",
+                                    canalDestination,
+                                    batchId,
+                                    System.currentTimeMillis() - begin);
                             }
                             connector.ack(batchId); // 提交确认
                             break;
@@ -132,11 +128,15 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
                             if (i != retry - 1) {
                                 connector.rollback(batchId); // 处理失败, 回滚数据
                                 logger.error(e.getMessage() + " Error sync and rollback, execute times: " + (i + 1));
-                                Util.sendWarnMsg(canalDestination + "处理失败:" + e.getMessage() + ",回滚数据,再次重试");
+                                if("online".equals(canalClientConfig.getEnv())) {
+                                    Util.sendWarnMsg(canalDestination + "处理失败:" + e.getMessage() + ",回滚数据,再次重试");
+                                }
                             } else {
                                 connector.ack(batchId);
                                 logger.error(e.getMessage() + " Error sync but ACK!");
-                                Util.sendWarnMsg(canalDestination + "处理失败:" + e.getMessage() + ",放弃重试");
+                                if("online".equals(canalClientConfig.getEnv())) {
+                                    Util.sendWarnMsg(canalDestination + "处理失败:" + e.getMessage() + ",放弃重试");
+                                }
                             }
                             Thread.sleep(500);
                         }
@@ -145,7 +145,9 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
 
             } catch (Throwable e) {
                 logger.error("process error!", e);
-                Util.sendWarnMsg("处理失败:" + e.getMessage());
+                if("online".equals(canalClientConfig.getEnv())) {
+                    Util.sendWarnMsg("处理失败:" + e.getMessage());
+                }
             } finally {
                 connector.disconnect();
                 logger.info("=============> Disconnect destination: {} <=============", this.canalDestination);
@@ -190,10 +192,14 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
             logger.info("destination {} adapters worker thread dead!", canalDestination);
             canalOuterAdapters.forEach(outerAdapters -> outerAdapters.forEach(OuterAdapter::destroy));
             logger.info("destination {} all adapters destroyed!", canalDestination);
-            Util.sendWarnMsg("停止成功:" + canalDestination);
+            if("online".equals(canalClientConfig.getEnv())) {
+                Util.sendWarnMsg("停止成功:" + canalDestination);
+            }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            Util.sendWarnMsg("停止失败:" + canalDestination + ",原因：" + e.getMessage());
+            if("online".equals(canalClientConfig.getEnv())) {
+                Util.sendWarnMsg("停止失败:" + canalDestination + ",原因：" + e.getMessage());
+            }
         }
     }
 }

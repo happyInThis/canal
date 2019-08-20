@@ -40,13 +40,6 @@ public class Util {
 
     private static final Logger logger = LoggerFactory.getLogger(Util.class);
 
-    private static String env = "dev";
-
-    @Value("${canal.conf.env}")
-    public void setEnv(String env) {
-        Util.env = env;
-    }
-
     /**
      * 通过DS执行sql
      */
@@ -311,27 +304,31 @@ public class Util {
      * @param msg
      */
     public static void sendWarnMsg(String msg){
-        if("online".equals(env)) {
-            threadPoolExecutor.execute(() -> {
-                JSONObject jsonObject = new JSONObject();
-                JSONObject dataObject = new JSONObject();
-                dataObject.put("title", "canal告警");
-                dataObject.put("text", "## [canal告警]增量同步异常告警\n" + "> [内容] " + msg);
-                jsonObject.put("msgtype", "markdown");
-                jsonObject.put("markdown", dataObject);
-                Header header = new BasicHeader("Content-Type", "application/json");
-                try {
-                    String result = HttpClientUtils.getInstance().postWithData("https://oapi.dingtalk.com/robot/send?access_token=543cb65c3fca9f032966a914a8488e1c5a474b649b94d15e927967db215e1b37", Arrays.asList(header), null, jsonObject.toJSONString().getBytes());
-                    if(StringUtils.isNotBlank(result)) {
-                        JSONObject jsonObject1 = JSON.parseObject(result);
-                        if(!"ok".equals(jsonObject1.getString("errmsg"))) {
-                            logger.error("sendWarnMsg fail msg:{}, error:{}", msg, jsonObject1.getString("errmsg"));
-                        }
+        threadPoolExecutor.execute(() -> {
+            JSONObject jsonObject = new JSONObject();
+            JSONObject dataObject = new JSONObject();
+            dataObject.put("title", "canal告警");
+            dataObject.put("text", "## [canal告警]增量同步异常告警\n" + "> [内容] " + msg);
+            jsonObject.put("msgtype", "markdown");
+            jsonObject.put("markdown", dataObject);
+            Header header = new BasicHeader("Content-Type", "application/json");
+            try {
+                String result = HttpClientUtils.getInstance().postWithData("https://oapi.dingtalk.com/robot/send?access_token=543cb65c3fca9f032966a914a8488e1c5a474b649b94d15e927967db215e1b37", Arrays.asList(header), null, jsonObject.toJSONString().getBytes());
+                System.out.println(result);
+                if(StringUtils.isNotBlank(result)) {
+                    JSONObject jsonObject1 = JSON.parseObject(result);
+                    if(!"ok".equals(jsonObject1.getString("errmsg"))) {
+                        logger.error("sendWarnMsg fail msg:{}, error:{}", msg, jsonObject1.getString("errmsg"));
                     }
-                } catch(Exception e) {
-                    logger.error("sendWarnMsg fail msg:" + msg + ",error:" + e.getMessage(), e);
                 }
-            });
-        }
+            } catch(Exception e) {
+                logger.error("sendWarnMsg fail msg:" + msg + ",error:" + e.getMessage(), e);
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        sendWarnMsg("测试");
+        threadPoolExecutor.shutdown();
     }
 }

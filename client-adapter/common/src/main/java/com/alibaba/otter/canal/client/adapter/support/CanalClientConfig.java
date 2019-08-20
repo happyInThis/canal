@@ -26,10 +26,10 @@ public class CanalClientConfig {
     private Integer            syncBatchSize = 1000;
     // 重试次数
     private Integer            retries;
+    // 环境标签
+    private String            env;
     // 消费超时时间
     private Long               timeout;
-    // 延迟告警时间
-    private Long               delayTime;
     // 模式 tcp kafka rocketMQ
     private String             mode          = "tcp";
     // aliyun ak/sk
@@ -102,20 +102,20 @@ public class CanalClientConfig {
         this.retries = retries;
     }
 
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
+    }
+
     public Long getTimeout() {
         return timeout;
     }
 
     public void setTimeout(Long timeout) {
         this.timeout = timeout;
-    }
-
-    public Long getDelayTime() {
-        return delayTime;
-    }
-
-    public void setDelayTime(Long delayTime) {
-        this.delayTime = delayTime;
     }
 
     public String getMode() {

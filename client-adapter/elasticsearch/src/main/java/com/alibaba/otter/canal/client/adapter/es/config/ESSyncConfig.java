@@ -22,6 +22,8 @@ public class ESSyncConfig implements AdapterConfig {
     private String    groupId;         // group id
 
     private String    destination;     // canal destination
+    private String    env;     // canal env
+    private int       delayTime;     // canal delay
 
     private ESMapping esMapping;
 
@@ -70,6 +72,22 @@ public class ESSyncConfig implements AdapterConfig {
 
     public void setDestination(String destination) {
         this.destination = destination;
+    }
+
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
+    }
+
+    public int getDelayTime() {
+        return delayTime;
+    }
+
+    public void setDelayTime(int delayTime) {
+        this.delayTime = delayTime;
     }
 
     public ESMapping getEsMapping() {
