@@ -62,11 +62,10 @@ public abstract class AbstractCanalAdapterWorker {
                         if (dmls != null) {
                             batchSync(dmls, adapter);
 
-                            if (logger.isDebugEnabled()) {
-                                logger.debug("{} elapsed time: {}",
-                                    adapter.getClass().getName(),
-                                    (System.currentTimeMillis() - begin));
-                            }
+                            logger.info("{} elapsed time: {}, batchId:{}",
+                                adapter.getClass().getName(),
+                                (System.currentTimeMillis() - begin),
+                                message.getId());
                         }
                     });
                     return true;

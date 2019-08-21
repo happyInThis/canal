@@ -106,7 +106,7 @@ public class SessionHandler extends SimpleChannelHandler {
                     break;
                 case GET:
                     Get get = CanalPacket.Get.parseFrom(packet.getBody());
-                    logger.info("get:{}", get.toString());
+                    logger.info("get: destination{} clientId:{}", get.getDestination(), get.getClientId());
                     long startTime = System.currentTimeMillis();
                     if (StringUtils.isNotEmpty(get.getDestination()) && StringUtils.isNotEmpty(get.getClientId())) {
                         clientIdentity = new ClientIdentity(get.getDestination(), Short.valueOf(get.getClientId()));

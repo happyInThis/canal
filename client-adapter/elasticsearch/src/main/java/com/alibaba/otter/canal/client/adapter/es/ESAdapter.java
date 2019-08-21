@@ -131,8 +131,8 @@ public class ESAdapter implements OuterAdapter {
             ESTemplate esTemplate = new ESTemplate(esConnection);
             esSyncService = new ESSyncService(esTemplate);
 
-            esConfigMonitor = new ESConfigMonitor();
-            esConfigMonitor.init(this, envProperties);
+//            esConfigMonitor = new ESConfigMonitor();
+//            esConfigMonitor.init(this, envProperties);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

@@ -76,11 +76,11 @@ public class ESSyncService {
                     esSyncConfigs.size(),
                     dml.getDestination());
             }
-            if (logger.isDebugEnabled()) {
+            if (logger.isTraceEnabled()) {
                 StringBuilder configIndexes = new StringBuilder();
                 esSyncConfigs
                     .forEach(esSyncConfig -> configIndexes.append(esSyncConfig.getEsMapping().get_index()).append(" "));
-                logger.debug("DML: {} \nAffected indexes: {}",
+                logger.trace("DML: {} \nAffected indexes: {}",
                     JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue),
                     configIndexes.toString());
             }
@@ -119,7 +119,7 @@ public class ESSyncService {
 
                 Object id = esTemplate.getValFromData(config.getEsMapping(), dml.getData().get(0), "id", "id");
                 DateTime dateTime = new DateTime(System.currentTimeMillis());
-                Util.sendWarnMsg("time:" + dateTime.toString("yyyy-MM-dd HH:mm:dd") + " 延迟过大：" + delay + "ms +999. table:" + dml.getTable() + "type:" + dml.getType() + ",id:" + id);
+                Util.sendWarnMsg("time:" + dateTime.toString("yyyy-MM-dd HH:mm:dd") + " 延迟过大：" + delay + "ms +999. table:" + dml.getTable() + " type:" + dml.getType() + " id:" + id);
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
