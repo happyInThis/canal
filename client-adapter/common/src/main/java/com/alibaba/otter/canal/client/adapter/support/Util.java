@@ -298,7 +298,7 @@ public class Util {
 
         return null;
     }
-    public static final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(100, 100, 30, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(1000));
+    public static final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(10, 10, 30, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(1000));
     /**
      * 发送告警消息
      * @param msg

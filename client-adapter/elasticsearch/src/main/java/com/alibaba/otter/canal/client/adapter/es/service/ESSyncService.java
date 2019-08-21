@@ -5,6 +5,7 @@ import java.util.*;
 import javax.sql.DataSource;
 
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,8 +116,10 @@ public class ESSyncService {
                     config.getEsMapping().get_index());
             }
             if("online".equals(config.getEnv()) && delay > config.getDelayTime()) {
-                Util.sendWarnMsg("延迟过大：" + delay + "ms +999. table:" + dml.getTable() + ",id:" +
-                        esTemplate.getValFromData(config.getEsMapping(), dml.getData().get(0), "id", "id"));
+
+                Object id = esTemplate.getValFromData(config.getEsMapping(), dml.getData().get(0), "id", "id");
+                DateTime dateTime = new DateTime(System.currentTimeMillis());
+                Util.sendWarnMsg("time:" + dateTime.toString("yyyy-MM-dd HH:mm:dd") + " 延迟过大：" + delay + "ms +999. table:" + dml.getTable() + "type:" + dml.getType() + ",id:" + id);
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);

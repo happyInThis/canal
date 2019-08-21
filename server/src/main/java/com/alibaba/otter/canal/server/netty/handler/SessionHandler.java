@@ -106,6 +106,8 @@ public class SessionHandler extends SimpleChannelHandler {
                     break;
                 case GET:
                     Get get = CanalPacket.Get.parseFrom(packet.getBody());
+                    logger.info("get:{}", get.toString());
+                    long startTime = System.currentTimeMillis();
                     if (StringUtils.isNotEmpty(get.getDestination()) && StringUtils.isNotEmpty(get.getClientId())) {
                         clientIdentity = new ClientIdentity(get.getDestination(), Short.valueOf(get.getClientId()));
                         MDC.put("destination", clientIdentity.getDestination());
@@ -131,7 +133,7 @@ public class SessionHandler extends SimpleChannelHandler {
                                 unit);
                         }
                         // }
-
+                        logger.info("pull data elapsed time:{} clientId:{} massageId:{}", (System.currentTimeMillis() - startTime), get.getClientId(), message.getId());
                         if (message.getId() != -1 && message.isRaw()) {
                             List<ByteString> rowEntries = message.getRawEntries();
                             // message size
@@ -202,6 +204,7 @@ public class SessionHandler extends SimpleChannelHandler {
                             NettyUtils.write(ctx.getChannel(), body, new ChannelFutureAggregator(get.getDestination(),
                                     get, packet.getType(), body.length, System.nanoTime() - start, message.getId() == -1));// 输出数据
                         }
+                        logger.info("write data finished elapsed time:{} clientId:{} messageId:{}", (System.currentTimeMillis() - startTime),get.getClientId(), message.getId());
                     } else {
                         byte[] errorBytes = NettyUtils.errorPacket(401, MessageFormatter.format("destination or clientId is null", get.toString()).getMessage());
                         NettyUtils.write(ctx.getChannel(), errorBytes, new ChannelFutureAggregator(get.getDestination(),

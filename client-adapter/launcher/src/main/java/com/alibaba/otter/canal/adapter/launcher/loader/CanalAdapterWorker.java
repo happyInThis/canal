@@ -104,6 +104,7 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
                         if (!running) {
                             break;
                         }
+                        long begin = System.currentTimeMillis();
                         Message message = connector.getWithoutAck(batchSize); // 获取指定数量的数据
                         long batchId = message.getId();
                         try {
@@ -115,7 +116,6 @@ public class CanalAdapterWorker extends AbstractCanalAdapterWorker {
                                     canalDestination,
                                     batchId,
                                     size);
-                                long begin = System.currentTimeMillis();
                                 writeOut(message);
                                 logger.info("destination: {} batchId: {} elapsed time: {} ms",
                                     canalDestination,
