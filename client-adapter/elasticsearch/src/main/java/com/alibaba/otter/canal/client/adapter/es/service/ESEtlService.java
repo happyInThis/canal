@@ -208,7 +208,7 @@ public class ESEtlService extends AbstractEtlService {
                     if (rp.hasFailures()) {
                         this.processFailBulkResponse(rp);
                     }
-                    logger.info("全量数据批量导入最后批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, firstId:{}, lastId:{}",
+                    logger.info("全量数据批量导入批次耗时: {}, es执行时间: {}, 批次大小: {}, index; {}, firstId:{}, lastId:{}",
                         (System.currentTimeMillis() - batchBegin),
                         (System.currentTimeMillis() - esBatchBegin),
                         esBulkRequest.numberOfActions(),

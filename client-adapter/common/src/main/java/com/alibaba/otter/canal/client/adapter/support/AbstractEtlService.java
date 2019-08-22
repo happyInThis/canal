@@ -2,7 +2,9 @@ package com.alibaba.otter.canal.client.adapter.support;
 
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.otter.canal.common.utils.NamedThreadFactory;
 import com.google.common.base.Joiner;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,8 +92,8 @@ public abstract class AbstractEtlService {
             if (logger.isDebugEnabled()) {
                 logger.debug("shard {} startId {} endId {} threadCount {}", shard, startId, endId, threadCount);
             }
-
-            ExecutorService executor = Util.newFixedThreadPool(threadCount, 5000L);
+            NamedThreadFactory namedThreadFactory = new NamedThreadFactory("Full-thread-");
+            ExecutorService executor = Util.newFixedThreadPool(threadCount, 5000L, namedThreadFactory);
             List<Future<Map>> futures = new ArrayList<>();
 
 
@@ -103,9 +105,8 @@ public abstract class AbstractEtlService {
                 } else {
                     to = from + shard;
                 }
-                Future<Map> future = executor.submit(
+                Future future = executor.submit(
                         () -> {
-                            Map result = new HashMap();
                             long fromId = from;
                             long toId = fromId + size;
                             List<Object> innerValues = new ArrayList();
@@ -117,7 +118,24 @@ public abstract class AbstractEtlService {
                             innerValues.add(0, toId);
                             innerValues.add(0, fromId);
                             while(to > fromId) {
-                                result = (Map) executeSqlImport(dataSource, sqlFinal, innerValues, config.getMapping(), impCount, errMsg);
+                                try {
+                                    executeSqlImport(dataSource, sqlFinal, innerValues, config.getMapping(), impCount, errMsg);
+                                } catch(Exception e) {
+                                    logger.error(String.format("全量数据批量导入 异常 currentThread:%s fromId:%s, toId:%s, msg:%s",
+                                            Thread.currentThread().getName(),
+                                            fromId,
+                                            toId), e);
+                                    DateTime dateTime = new DateTime(System.currentTimeMillis());
+                                    Util.sendWarnMsg(String.format("time:%s 同步失败 fromId:%d toId:%d",
+                                            dateTime.toString("yyyy-MM-dd HH:mm:dd"),
+                                            fromId,
+                                            toId));
+                                    try {
+                                        Thread.sleep(500L);
+                                    } catch(InterruptedException ex) {
+
+                                    }
+                                }
                                 fromId = toId;
                                 toId = fromId + size;
                                 innerValues.remove(0);
@@ -125,12 +143,12 @@ public abstract class AbstractEtlService {
                                 innerValues.add(0, toId);
                                 innerValues.add(0, fromId);
                             }
-                            return result;
+                            logger.info("currentThread:{} 全量数据批量导入完成", Thread.currentThread().getName());
                         });
                 futures.add(future);
             }
 
-            for (Future<Map> future : futures) {
+            for (Future future : futures) {
                 future.get();
             }
             executor.shutdown();

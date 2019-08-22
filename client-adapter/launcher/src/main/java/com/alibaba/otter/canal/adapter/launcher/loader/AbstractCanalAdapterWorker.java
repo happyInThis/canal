@@ -105,11 +105,9 @@ public abstract class AbstractCanalAdapterWorker {
                         List<Dml> dmls = MessageUtil.flatMessage2Dml(canalDestination, groupId, flatMessages);
                         batchSync(dmls, adapter);
 
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("{} elapsed time: {}",
-                                adapter.getClass().getName(),
-                                (System.currentTimeMillis() - begin));
-                        }
+                        logger.info("{} elapsed time: {}",
+                            adapter.getClass().getName(),
+                            (System.currentTimeMillis() - begin));
                     });
                     return true;
                 } catch (Exception e) {

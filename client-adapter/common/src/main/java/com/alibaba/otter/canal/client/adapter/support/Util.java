@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -143,6 +144,24 @@ public class Util {
             keepAliveTime,
             TimeUnit.MILLISECONDS,
             new SynchronousQueue<>(),
+            (r, exe) -> {
+                if (!exe.isShutdown()) {
+                    try {
+                        exe.getQueue().put(r);
+                    } catch (InterruptedException e) {
+                        // ignore
+                    }
+                }
+            });
+    }
+
+    public static ThreadPoolExecutor newFixedThreadPool(int nThreads, long keepAliveTime, ThreadFactory threadFactory) {
+        return new ThreadPoolExecutor(nThreads,
+            nThreads,
+            keepAliveTime,
+            TimeUnit.MILLISECONDS,
+            new SynchronousQueue(),
+            threadFactory,
             (r, exe) -> {
                 if (!exe.isShutdown()) {
                     try {

@@ -34,12 +34,12 @@ public class EtlLock {
 
     @PostConstruct
     public void init() {
-        CuratorFramework curator = curatorClient.getCurator();
-        if (curator != null) {
-            mode = Mode.DISTRIBUTED;
-        } else {
+//        CuratorFramework curator = curatorClient.getCurator();
+//        if (curator != null) {
+//            mode = Mode.DISTRIBUTED;
+//        } else {
             mode = Mode.LOCAL;
-        }
+//        }
     }
 
     private ReentrantLock getLock(String key) {
@@ -71,22 +71,22 @@ public class EtlLock {
     }
 
     public void lock(String key) throws Exception {
-        if (mode == Mode.LOCAL) {
+//        if (mode == Mode.LOCAL) {
             getLock(key).lock();
-        } else {
-            InterProcessMutex lock = getRemoteLock(key);
-            lock.acquire();
-        }
+//        } else {
+//            InterProcessMutex lock = getRemoteLock(key);
+//            lock.acquire();
+//        }
     }
 
     public boolean tryLock(String key, long timeout, TimeUnit unit) {
         try {
-            if (mode == Mode.LOCAL) {
+//            if (mode == Mode.LOCAL) {
                 return getLock(key).tryLock(timeout, unit);
-            } else {
-                InterProcessMutex lock = getRemoteLock(key);
-                return lock.acquire(timeout, unit);
-            }
+//            } else {
+//                InterProcessMutex lock = getRemoteLock(key);
+//                return lock.acquire(timeout, unit);
+//            }
         } catch (Exception e) {
             return false;
         }
@@ -94,27 +94,27 @@ public class EtlLock {
 
     public boolean tryLock(String key) {
         try {
-            if (mode == Mode.LOCAL) {
+//            if (mode == Mode.LOCAL) {
                 return getLock(key).tryLock();
-            } else {
-                InterProcessMutex lock = getRemoteLock(key);
-                return lock.acquire(500, TimeUnit.MILLISECONDS);
-            }
+//            } else {
+//                InterProcessMutex lock = getRemoteLock(key);
+//                return lock.acquire(500, TimeUnit.MILLISECONDS);
+//            }
         } catch (Exception e) {
             return false;
         }
     }
 
     public void unlock(String key) {
-        if (mode == Mode.LOCAL) {
+//        if (mode == Mode.LOCAL) {
             getLock(key).unlock();
-        } else {
-            InterProcessMutex lock = getRemoteLock(key);
-            try {
-                lock.release();
-            } catch (Exception e) {
-                // ignore
-            }
-        }
+//        } else {
+//            InterProcessMutex lock = getRemoteLock(key);
+//            try {
+//                lock.release();
+//            } catch (Exception e) {
+//                 ignore
+//            }
+//        }
     }
 }
