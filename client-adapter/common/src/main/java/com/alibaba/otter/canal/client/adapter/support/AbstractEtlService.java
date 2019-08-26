@@ -82,7 +82,7 @@ public abstract class AbstractEtlService {
 
             int threadCount = Runtime.getRuntime().availableProcessors() * 2;
 
-            long shard = endId / threadCount;
+            long shard = (endId - startId) / threadCount;
             long size = CNT_PER_TASK;
 
             String sqlFinal = sql + " order by id asc";
@@ -105,10 +105,16 @@ public abstract class AbstractEtlService {
                 } else {
                     to = from + shard;
                 }
+                logger.info("全量数据批量导入开始 currentThread:{} fromId:{}, toId:{}",
+                        Thread.currentThread().getName(),
+                        from,
+                        to);
+                final Long count = (to - from) > size ? size : (to - from);
                 Future future = executor.submit(
                         () -> {
                             long fromId = from;
-                            long toId = fromId + size;
+                            long toId = fromId + count;
+
                             List<Object> innerValues = new ArrayList();
                             for(String value : params) {
                                 innerValues.add(value);
@@ -124,7 +130,8 @@ public abstract class AbstractEtlService {
                                     logger.error(String.format("全量数据批量导入 异常 currentThread:%s fromId:%s, toId:%s, msg:%s",
                                             Thread.currentThread().getName(),
                                             fromId,
-                                            toId), e);
+                                            toId,
+                                            e.getMessage()), e);
                                     DateTime dateTime = new DateTime(System.currentTimeMillis());
                                     Util.sendWarnMsg(String.format("time:%s 同步失败 fromId:%d toId:%d",
                                             dateTime.toString("yyyy-MM-dd HH:mm:dd"),
@@ -137,7 +144,10 @@ public abstract class AbstractEtlService {
                                     }
                                 }
                                 fromId = toId;
-                                toId = fromId + size;
+                                toId = fromId + count;
+                                if(toId > to) {
+                                    toId = to;
+                                }
                                 innerValues.remove(0);
                                 innerValues.remove(0);
                                 innerValues.add(0, toId);

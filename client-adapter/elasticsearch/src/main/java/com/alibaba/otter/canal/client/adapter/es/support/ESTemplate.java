@@ -150,32 +150,46 @@ public class ESTemplate {
         // TODO 直接外部包裹sql会导致全表扫描性能低, 待优化拼接内部where条件
         int len = sql.length();
         sql.delete(len - 4, len);
-        Integer syncCount = (Integer) Util.sqlRS(ds, sql.toString(), values, rs -> {
-            int count = 0;
-            try {
-                while (rs.next()) {
-                    Object idVal = getIdValFromRS(mapping, rs);
-                    if (StringUtils.isNotEmpty(config.getEsMapping().getRouting())) {
-                        Object routingVal;
-                        routingVal = getValFromRS(mapping, rs, mapping.getRouting(), mapping.getRouting());
-                        if (routingVal != null) {
-                            esFieldData.put("$routing", routingVal.toString());
+        Integer retry = 3;
+        Integer syncCount = 0;
+        while(retry > 0) {
+            syncCount = (Integer) Util.sqlRS(ds, sql.toString(), values, rs -> {
+                int count = 0;
+                try {
+                    while(rs.next()) {
+                        Object idVal = getIdValFromRS(mapping, rs);
+                        if(StringUtils.isNotEmpty(config.getEsMapping().getRouting())) {
+                            Object routingVal;
+                            routingVal = getValFromRS(mapping, rs, mapping.getRouting(), mapping.getRouting());
+                            if(routingVal != null) {
+                                esFieldData.put("$routing", routingVal.toString());
+                            }
                         }
+                        append4Update(mapping, idVal, esFieldData);
+                        commitBulk();
+                        count++;
                     }
-                    append4Update(mapping, idVal, esFieldData);
-                    commitBulk();
-                    count++;
+
+                } catch(Exception e) {
+                    throw new RuntimeException(e);
                 }
-                if("online".equals(config.getEnv()) && count == 0) {
-                    Util.sendWarnMsg("查询无数据,sql:" + sql + ",values:" + JSON.toJSONString(values));
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+                return count;
+            });
+            if(logger.isTraceEnabled()) {
+                logger.trace("Update ES by query affected {} records", syncCount);
             }
-            return count;
-        });
-        if (logger.isTraceEnabled()) {
-            logger.trace("Update ES by query affected {} records", syncCount);
+            if(syncCount > 0) {
+                break;
+            }
+            try {
+                Thread.sleep(100);
+            } catch(InterruptedException e) {
+                e.printStackTrace();
+            }
+            retry--;
+        }
+        if("online".equals(config.getEnv()) && syncCount == 0) {
+            Util.sendWarnMsg("查询无数据\nsql:" + sql + ",\nvalues:" + JSON.toJSONString(values));
         }
     }
 

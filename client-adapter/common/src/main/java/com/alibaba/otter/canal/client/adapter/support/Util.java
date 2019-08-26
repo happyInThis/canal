@@ -338,6 +338,7 @@ public class Util {
                     JSONObject jsonObject1 = JSON.parseObject(result);
                     if(!"ok".equals(jsonObject1.getString("errmsg"))) {
                         logger.error("sendWarnMsg fail msg:{}, error:{}", msg, jsonObject1.getString("errmsg"));
+                        Thread.sleep(500);
                     }
                 }
             } catch(Exception e) {
