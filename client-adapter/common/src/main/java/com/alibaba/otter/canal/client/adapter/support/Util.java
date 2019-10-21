@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -317,13 +316,14 @@ public class Util {
 
         return null;
     }
-    public static final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(10, 10, 30, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(1000));
+
+    public static final ThreadPoolExecutor THREAD_POOL_EXECUTOR = new ThreadPoolExecutor(20, 20, 30, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.DiscardOldestPolicy());
     /**
      * 发送告警消息
      * @param msg
      */
     public static void sendWarnMsg(String msg){
-        threadPoolExecutor.execute(() -> {
+        THREAD_POOL_EXECUTOR.execute(() -> {
             JSONObject jsonObject = new JSONObject();
             JSONObject dataObject = new JSONObject();
             dataObject.put("title", "canal告警");
@@ -348,7 +348,8 @@ public class Util {
     }
 
     public static void main(String[] args) {
-        sendWarnMsg("测试");
-        threadPoolExecutor.shutdown();
+//        sendWarnMsg("测试");
+//        THREAD_POOL_EXECUTOR.shutdown();
+        System.out.println(timeZone);
     }
 }

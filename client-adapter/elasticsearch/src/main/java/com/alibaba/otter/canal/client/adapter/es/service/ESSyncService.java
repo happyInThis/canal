@@ -119,12 +119,12 @@ public class ESSyncService {
 
                 Object id = esTemplate.getValFromData(config.getEsMapping(), dml.getData().get(0), "id", "id");
                 DateTime dateTime = new DateTime(System.currentTimeMillis());
-                Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:dd") +
-                        "\n索引：" + config.getEsMapping().get_index() +
-                        "\n延迟过大：" + delay +
-                        "ms\ntable:" + dml.getTable() +
-                        "\ntype:" + dml.getType() +
-                        "\nid:" + id);
+                Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
+                        "\n\n索引：" + config.getEsMapping().get_index() +
+                        "\n\n延迟过大：" + delay +
+                        "ms\n\ntable:" + dml.getTable() +
+                        "\n\ntype:" + dml.getType() +
+                        "\n\nid:" + id);
             }
         } catch (Throwable e) {
             logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
