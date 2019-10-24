@@ -133,10 +133,9 @@ public abstract class AbstractEtlService {
                                             toId,
                                             e.getMessage()), e);
                                     DateTime dateTime = new DateTime(System.currentTimeMillis());
-                                    Util.sendWarnMsg(String.format("time:%s 同步失败 fromId:%d toId:%d",
-                                            dateTime.toString("yyyy-MM-dd HH:mm:dd"),
-                                            fromId,
-                                            toId));
+                                    if("online".equals(config.getEnv())) {
+                                        Util.sendWarnMsg(String.format("time:%s 同步失败 fromId:%d toId:%d", dateTime.toString("yyyy-MM-dd HH:mm:dd"), fromId, toId));
+                                    }
                                     try {
                                         Thread.sleep(500L);
                                     } catch(InterruptedException ex) {

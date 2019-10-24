@@ -58,6 +58,9 @@ public class ESSyncService {
             }
 
             for (ESSyncConfig config : esSyncConfigs) {
+                if(dml.getType().equalsIgnoreCase(config.getSkipType())) {
+                    continue;
+                }
                 if (logger.isTraceEnabled()) {
                     logger.trace("Prepared to sync index: {}, destination: {}",
                         config.getEsMapping().get_index(),
@@ -224,7 +227,20 @@ public class ESSyncService {
             if (data == null || data.isEmpty() || old == null || old.isEmpty()) {
                 continue;
             }
+            boolean isContinue = true;
+            for (FieldItem fieldItem : schemaItem.getSelectFields().values()) {
+                String columnName = fieldItem.getColumnItems().iterator().next().getColumnName();
 
+                if (old.containsKey(columnName) && !config.getEsMapping().getSkips().contains(fieldItem.getFieldName()) &&
+                        schemaItem.getAliasTableItems().get(fieldItem.getOwner()).getTableName().equals(dml.getTable())) {
+                    isContinue = false;
+                    break;
+                }
+
+            }
+            if(isContinue) {
+                continue;
+            }
             if (schemaItem.getAliasTableItems().size() == 1 && schemaItem.isAllFieldsSimple()) {
                 // ------单表 & 所有字段都为简单字段------
                 singleTableSimpleFiledUpdate(config, dml, data, old);

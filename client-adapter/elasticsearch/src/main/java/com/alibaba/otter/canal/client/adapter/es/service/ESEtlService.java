@@ -99,20 +99,29 @@ public class ESEtlService extends AbstractEtlService {
 
                         // 如果是主键字段则不插入
                         if (fieldItem.getFieldName().equals(mapping.get_id())) {
-                            idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
+                            try {
+                                idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
+                            } catch(Exception e) {
+                                logger.error("sync error, es index: {}, id : {}", mapping.get_index(), rs.getObject(fieldName));
+                            }
                         } else if(fieldItem.getFieldName().equals(mapping.getRouting())) {
                             try {
                                 routingVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
                                 esFieldData.put(Util.cleanColumn(fieldName), routingVal);
-                            } catch (SQLException e) {
+                            }  catch (SQLException e) {
                                 throw new RuntimeException(e);
+                            } catch(Exception e) {
+                                logger.error("sync error, es index: {}, routing : {}", mapping.get_index(), rs.getObject(fieldName));
                             }
                         } else {
                             Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
                             esFieldData.put(Util.cleanColumn(fieldName), val);
                         }
                     }
-
+                    if(idVal == null || routingVal == null) {
+                        logger.error("sync error, es index: {}, id : {}, routing:{},data:{}", mapping.get_index(), idVal, routingVal, JSON.toJSONString(esFieldData));
+                        continue;
+                    }
                     if (!mapping.getRelations().isEmpty()) {
                         mapping.getRelations().forEach((relationField, relationMapping) -> {
                             Map<String, Object> relations = new HashMap<>();

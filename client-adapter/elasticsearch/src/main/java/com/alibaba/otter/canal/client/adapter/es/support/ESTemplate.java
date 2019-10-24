@@ -120,6 +120,11 @@ public class ESTemplate {
     public void update(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
         Map<String, Object> esFieldDataTmp = new LinkedHashMap<>(esFieldData.size());
         esFieldData.forEach((k, v) -> esFieldDataTmp.put(Util.cleanColumn(k), v));
+        String routingVal = (String) esFieldData.remove("$routing");
+        if(pkVal == null || routingVal == null) {
+            logger.error("sync error, es index: {}, id : {}, routing:{},data:{}", mapping.get_index(), pkVal, routingVal, JSON.toJSONString(esFieldData));
+            return;
+        }
         append4Update(mapping, pkVal, esFieldDataTmp);
         commitBulk();
     }

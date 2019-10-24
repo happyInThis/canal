@@ -24,6 +24,7 @@ public class ESSyncConfig implements AdapterConfig {
     private String    destination;     // canal destination
     private String    env;     // canal env
     private int       delayTime;     // canal delay
+    private String    skipType;     // canal skip
 
     private ESMapping esMapping;
 
@@ -88,6 +89,14 @@ public class ESSyncConfig implements AdapterConfig {
 
     public void setDelayTime(int delayTime) {
         this.delayTime = delayTime;
+    }
+
+    public String getSkipType() {
+        return skipType;
+    }
+
+    public void setSkipType(String skipType) {
+        this.skipType = skipType;
     }
 
     public ESMapping getEsMapping() {

@@ -22,6 +22,11 @@ public class MappingConfig implements AdapterConfig {
 
     private HbaseMapping hbaseMapping;    // hbase映射配置
 
+    @Override
+    public String getEnv() {
+        return null;
+    }
+
     public String getDataSourceKey() {
         return dataSourceKey;
     }

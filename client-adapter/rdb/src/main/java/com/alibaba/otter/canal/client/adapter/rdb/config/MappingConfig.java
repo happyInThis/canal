@@ -26,6 +26,11 @@ public class MappingConfig implements AdapterConfig {
 
     private DbMapping dbMapping;          // db映射配置
 
+    @Override
+    public String getEnv() {
+        return null;
+    }
+
     public String getDataSourceKey() {
         return dataSourceKey;
     }
