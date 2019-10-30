@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.LongAdder;
 public abstract class AbstractEtlService {
 
     protected Logger      logger = LoggerFactory.getLogger(this.getClass());
+    protected static final Logger errorLogger = LoggerFactory.getLogger("error");
 
     private String        type;
     private AdapterConfig config;
@@ -63,7 +64,7 @@ public abstract class AbstractEtlService {
                         id = rs.getLong("id");
                     }
                 } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
+                    errorLogger.error(e.getMessage(), e);
                 }
                 return id == null ? 0L : id - 1;
             });
@@ -75,7 +76,7 @@ public abstract class AbstractEtlService {
                         id = rs.getLong("id");
                     }
                 } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
+                    errorLogger.error(e.getMessage(), e);
                 }
                 return id == null ? 0L : id;
             });
@@ -125,9 +126,9 @@ public abstract class AbstractEtlService {
                             innerValues.add(0, fromId);
                             while(to > fromId) {
                                 try {
-                                    executeSqlImport(dataSource, sqlFinal, innerValues, config.getMapping(), impCount, errMsg);
+                                    executeSqlImport(dataSource, sqlFinal, innerValues, config, impCount, errMsg);
                                 } catch(Exception e) {
-                                    logger.error(String.format("全量数据批量导入 异常 currentThread:%s fromId:%s, toId:%s, msg:%s",
+                                    errorLogger.error(String.format("全量数据批量导入 异常 currentThread:%s fromId:%s, toId:%s, msg:%s",
                                             Thread.currentThread().getName(),
                                             fromId,
                                             toId,
@@ -165,7 +166,7 @@ public abstract class AbstractEtlService {
             logger.info("数据全量导入完成, 一共导入 {} 条数据, 耗时: {}", impCount.longValue(), System.currentTimeMillis() - startTime);
             etlResult.setResultMessage("导入" + type + " 数据：" + impCount.longValue() + " 条");
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            errorLogger.error(e.getMessage(), e);
             errMsg.add(type + " 数据导入异常 =>" + e.getMessage() + "," + JSON.toJSONString(errMsg));
         }
         if (errMsg.isEmpty()) {
@@ -177,7 +178,7 @@ public abstract class AbstractEtlService {
     }
 
     protected abstract Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                                AdapterConfig.AdapterMapping mapping, LongAdder impCount,
+                                                AdapterConfig config, LongAdder impCount,
                                                 List<String> errMsg);
 
 }

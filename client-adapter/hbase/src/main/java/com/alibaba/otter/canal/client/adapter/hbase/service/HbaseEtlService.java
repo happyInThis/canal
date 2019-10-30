@@ -94,8 +94,8 @@ public class HbaseEtlService extends AbstractEtlService {
      * 执行导入
      */
     protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping mapping, LongAdder impCount, List<String> errMsg) {
-        MappingConfig.HbaseMapping hbaseMapping = (MappingConfig.HbaseMapping) mapping;
+                                       AdapterConfig config, LongAdder impCount, List<String> errMsg) {
+        MappingConfig.HbaseMapping hbaseMapping = (MappingConfig.HbaseMapping) config.getMapping();
         try {
             Util.sqlRS(ds, sql, values, rs -> {
                 int i = 1;

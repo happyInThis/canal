@@ -18,6 +18,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,7 @@ import com.alibaba.otter.canal.client.adapter.support.Util;
 public class ESTemplate {
 
     private static final Logger logger = LoggerFactory.getLogger(ESTemplate.class);
+    private static final Logger errorLogger = LoggerFactory.getLogger("error");
 
     private static final int MAX_BATCH_SIZE = 1000;
 
@@ -62,14 +64,28 @@ public class ESTemplate {
     /**
      * 插入数据
      *
-     * @param mapping     配置对象
+     * @param config     配置对象
      * @param pkVal       主键值
      * @param esFieldData 数据Map
      */
-    public void insert(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
+    public void insert(ESSyncConfig config, Object pkVal, Map<String, Object> esFieldData) {
+        ESMapping mapping = config.getEsMapping();
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");
             String routingVal = (String) esFieldData.remove("$routing");
+            if(routingVal == null || StringUtils.isBlank(mapping.get_id()) || StringUtils.isBlank(routingVal)) {
+                errorLogger.error("sync error 参数缺失, es index: {},table: {}, id : {}, routing is null,data:{}", mapping.get_index(), config.getDestination(), pkVal, JSON.toJSONString(esFieldData));
+                return;
+            }
+            if("online".equals(config.getEnv())) {
+                DateTime dateTime = new DateTime(System.currentTimeMillis());
+                Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
+                        "\n\n索引：" + config.getEsMapping().get_index() +
+                        "\n\ntable:" + esFieldData.get("$table") +
+                        "\n\nid:" + pkVal +
+                        "\n\nrouting:" + routingVal);
+            }
+            esFieldData.remove("$table");
             if (mapping.isUpsert()) {
                 ESUpdateRequest updateRequest = esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
@@ -113,18 +129,28 @@ public class ESTemplate {
     /**
      * 根据主键更新数据
      *
-     * @param mapping     配置对象
+     * @param config     配置对象
      * @param pkVal       主键值
      * @param esFieldData 数据Map
      */
-    public void update(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
+    public void update(ESSyncConfig config, Object pkVal, Map<String, Object> esFieldData) {
+        ESMapping mapping = config.getEsMapping();
         Map<String, Object> esFieldDataTmp = new LinkedHashMap<>(esFieldData.size());
         esFieldData.forEach((k, v) -> esFieldDataTmp.put(Util.cleanColumn(k), v));
         String routingVal = (String) esFieldData.remove("$routing");
-        if(pkVal == null || routingVal == null) {
-            logger.error("sync error, es index: {}, id : {}, routing:{},data:{}", mapping.get_index(), pkVal, routingVal, JSON.toJSONString(esFieldData));
+        if(pkVal == null || StringUtils.isBlank(pkVal.toString()) || StringUtils.isBlank(routingVal)) {
+            errorLogger.error("sync error 参数缺失, es index: {},table: {}, id : {}, routing:{},data:{}", mapping.get_index(), config.getDestination(), pkVal, routingVal, JSON.toJSONString(esFieldData));
+            if("online".equals(config.getEnv())) {
+                DateTime dateTime = new DateTime(System.currentTimeMillis());
+                Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
+                        "\n\n索引：" + config.getEsMapping().get_index() +
+                        "\n\ntable:" + esFieldData.get("$table") +
+                        "\n\nid:" + pkVal +
+                        "\n\nrouting:" + routingVal);
+            }
             return;
         }
+        esFieldData.remove("$table");
         append4Update(mapping, pkVal, esFieldDataTmp);
         commitBulk();
     }
@@ -232,21 +258,27 @@ public class ESTemplate {
      */
     public void commit() {
         if (getBulk().numberOfActions() > 0) {
-            BulkResponse response = getBulk().bulk();
-            if (response.hasFailures()) {
-                for (BulkItemResponse itemResponse : response.getItems()) {
-                    if (!itemResponse.isFailed()) {
-                        continue;
-                    }
+            try {
+                BulkResponse response = getBulk().bulk();
+                if (response.hasFailures()) {
+                    for (BulkItemResponse itemResponse : response.getItems()) {
+                        if (!itemResponse.isFailed()) {
+                            continue;
+                        }
 
-                    if (itemResponse.getFailure().getStatus() == RestStatus.NOT_FOUND) {
-                        logger.error(itemResponse.getFailureMessage());
-                    } else {
-                        throw new RuntimeException("ES sync commit error" + itemResponse.getFailureMessage());
+                        if (itemResponse.getFailure().getStatus() == RestStatus.NOT_FOUND) {
+                            errorLogger.error(itemResponse.getFailureMessage());
+                        } else {
+                            throw new RuntimeException("ES sync commit error" + itemResponse.getFailureMessage());
+                        }
                     }
                 }
+            } catch(Exception e) {
+                errorLogger.error("sync error 参数错误", e);
+            } finally {
+                resetBulkRequestBuilder();
             }
-            resetBulkRequestBuilder();
+
         }
     }
 

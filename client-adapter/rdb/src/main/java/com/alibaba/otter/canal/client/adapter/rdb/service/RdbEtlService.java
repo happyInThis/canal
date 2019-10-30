@@ -47,9 +47,9 @@ public class RdbEtlService extends AbstractEtlService {
      * 执行导入
      */
     protected Object executeSqlImport(DataSource srcDS, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping mapping, LongAdder impCount, List<String> errMsg) {
+            AdapterConfig config, LongAdder impCount, List<String> errMsg) {
         try {
-            DbMapping dbMapping = (DbMapping) mapping;
+            DbMapping dbMapping = (DbMapping) config.getMapping();
             Map<String, String> columnsMap = new LinkedHashMap<>();
             Map<String, Integer> columnType = new LinkedHashMap<>();
 

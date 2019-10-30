@@ -35,6 +35,7 @@ import org.springframework.stereotype.Component;
 public class ESSyncService {
 
     private static Logger logger = LoggerFactory.getLogger(ESSyncService.class);
+    private static final Logger errorLogger = LoggerFactory.getLogger("error");
 
     private ESTemplate    esTemplate;
 
@@ -130,7 +131,7 @@ public class ESSyncService {
                         "\n\nid:" + id);
             }
         } catch (Throwable e) {
-            logger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
+            errorLogger.error("sync error, es index: {}, DML : {}", config.getEsMapping().get_index(), dml);
             if("online".equals(config.getEnv())) {
                 Util.sendWarnMsg("同步失败：" + JSON.toJSONString(dml, SerializerFeature.WriteMapNullValue));
             }
@@ -471,7 +472,7 @@ public class ESSyncService {
         ESMapping mapping = config.getEsMapping();
         Map<String, Object> esFieldData = new LinkedHashMap<>();
         Object idVal = esTemplate.getESDataFromDmlData(mapping, data, esFieldData);
-
+        esFieldData.put("$table", dml.getTable());
         if (logger.isTraceEnabled()) {
             logger.trace("Single table insert to es index, destination:{}, table: {}, index: {}, id: {}",
                 config.getDestination(),
@@ -479,7 +480,7 @@ public class ESSyncService {
                 mapping.get_index(),
                 idVal);
         }
-        esTemplate.insert(mapping, idVal, esFieldData);
+        esTemplate.insert(config, idVal, esFieldData);
     }
 
     /**
@@ -507,7 +508,7 @@ public class ESSyncService {
                 while (rs.next()) {
                     Map<String, Object> esFieldData = new LinkedHashMap<>();
                     Object idVal = esTemplate.getESDataFromRS(mapping, rs, esFieldData);
-
+                    esFieldData.put("$table", dml.getTable());
                     if (logger.isTraceEnabled()) {
                         logger.trace(
                             "Main table insert to es index by query sql, destination:{}, table: {}, index: {}, id: {}",
@@ -516,7 +517,7 @@ public class ESSyncService {
                             mapping.get_index(),
                             idVal);
                     }
-                    esTemplate.insert(mapping, idVal, esFieldData);
+                    esTemplate.insert(config, idVal, esFieldData);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -849,7 +850,8 @@ public class ESSyncService {
                 mapping.get_index(),
                 idVal);
         }
-        esTemplate.update(mapping, idVal, esFieldData);
+        esFieldData.put("$table", dml.getTable());
+        esTemplate.update(config, idVal, esFieldData);
     }
 
     /**
@@ -877,7 +879,7 @@ public class ESSyncService {
                 while (rs.next()) {
                     Map<String, Object> esFieldData = new LinkedHashMap<>();
                     Object idVal = esTemplate.getESDataFromRS(mapping, rs, old, esFieldData);
-
+                    esFieldData.put("$table", dml.getTable());
                     if (logger.isTraceEnabled()) {
                         logger.trace(
                             "Main table update to es index by query sql, destination:{}, table: {}, index: {}, id: {}",
@@ -886,7 +888,7 @@ public class ESSyncService {
                             mapping.get_index(),
                             idVal);
                     }
-                    esTemplate.update(mapping, idVal, esFieldData);
+                    esTemplate.update(config, idVal, esFieldData);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

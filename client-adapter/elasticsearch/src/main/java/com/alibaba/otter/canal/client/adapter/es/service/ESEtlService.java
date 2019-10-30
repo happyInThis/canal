@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 import javax.sql.DataSource;
@@ -68,16 +67,17 @@ public class ESEtlService extends AbstractEtlService {
             if (response.getFailure().getStatus() == RestStatus.NOT_FOUND) {
                 logger.warn(response.getFailureMessage());
             } else {
-                logger.error("全量导入数据有误 {},response:{}", response.getFailureMessage(), response);
+                errorLogger.error("全量导入数据有误 {},response:{}", response.getFailureMessage(), response);
                 throw new RuntimeException("全量数据 etl 异常: " + response.getFailureMessage());
             }
         }
     }
 
     protected Object executeSqlImport(DataSource ds, String sql, List<Object> values,
-                                       AdapterConfig.AdapterMapping adapterMapping, LongAdder impCount,
+            AdapterConfig config, LongAdder impCount,
                                        List<String> errMsg) {
-        ESMapping mapping = (ESMapping) adapterMapping;
+        ESSyncConfig esSyncConfig = (ESSyncConfig) config;
+        ESMapping mapping = esSyncConfig.getEsMapping();
         return Util.sqlRS(ds, sql, values, rs -> {
             Long lastId = null;
             int count = 0;
@@ -102,7 +102,8 @@ public class ESEtlService extends AbstractEtlService {
                             try {
                                 idVal = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
                             } catch(Exception e) {
-                                logger.error("sync error, es index: {}, id : {}", mapping.get_index(), rs.getObject(fieldName));
+                                errorLogger.error("sync error id参数错误, es index: {}, table: {}, id : {}", mapping.get_index(), esSyncConfig.getDestination(), rs.getObject(fieldName));
+                                break;
                             }
                         } else if(fieldItem.getFieldName().equals(mapping.getRouting())) {
                             try {
@@ -111,7 +112,8 @@ public class ESEtlService extends AbstractEtlService {
                             }  catch (SQLException e) {
                                 throw new RuntimeException(e);
                             } catch(Exception e) {
-                                logger.error("sync error, es index: {}, routing : {}", mapping.get_index(), rs.getObject(fieldName));
+                                errorLogger.error("sync error routing参数错误, es index: {}, table: {}, routing : {}", mapping.get_index(), esSyncConfig.getDestination(), rs.getObject(fieldName));
+                                break;
                             }
                         } else {
                             Object val = esTemplate.getValFromRS(mapping, rs, fieldName, fieldName);
@@ -119,7 +121,13 @@ public class ESEtlService extends AbstractEtlService {
                         }
                     }
                     if(idVal == null || routingVal == null) {
-                        logger.error("sync error, es index: {}, id : {}, routing:{},data:{}", mapping.get_index(), idVal, routingVal, JSON.toJSONString(esFieldData));
+                        errorLogger.error("sync error 参数丢失, es index: {}, table: {}, id : {}, pkId:{}, routing:{},data:{}",
+                                mapping.get_index(), esSyncConfig.getDestination(), lastId, idVal, routingVal, JSON.toJSONString(esFieldData));
+                        continue;
+                    }
+                    if(StringUtils.isBlank(idVal.toString()) || StringUtils.isBlank(routingVal.toString())) {
+                        errorLogger.error("sync error 参数丢失, es index: {}, table: {}, id : {}, pkId:{}, routing:{},data:{}",
+                                mapping.get_index(), esSyncConfig.getDestination(), lastId, idVal, routingVal, JSON.toJSONString(esFieldData));
                         continue;
                     }
                     if (!mapping.getRelations().isEmpty()) {
@@ -226,7 +234,7 @@ public class ESEtlService extends AbstractEtlService {
                         lastId);
                 }
             } catch (Exception e) {
-                logger.error(e.getMessage(), e);
+                errorLogger.error(e.getMessage(), e);
                 errMsg.add(mapping.get_index() + " etl failed! ==>" + e.getMessage());
                 throw new RuntimeException(e);
             }

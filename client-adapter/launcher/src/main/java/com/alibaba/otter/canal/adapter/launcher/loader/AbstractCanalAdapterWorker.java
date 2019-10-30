@@ -30,6 +30,7 @@ import com.alibaba.otter.canal.protocol.Message;
 public abstract class AbstractCanalAdapterWorker {
 
     protected final Logger                    logger  = LoggerFactory.getLogger(this.getClass());
+    protected final Logger                    errorLogger  = LoggerFactory.getLogger("error");
 
     protected String                          canalDestination;                                                // canal实例
     protected String                          groupId = null;                                                  // groupId
@@ -70,7 +71,7 @@ public abstract class AbstractCanalAdapterWorker {
                     });
                     return true;
                 } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
+                    errorLogger.error(e.getMessage(), e);
                     return false;
                 }
             }));
@@ -111,7 +112,7 @@ public abstract class AbstractCanalAdapterWorker {
                     });
                     return true;
                 } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
+                    errorLogger.error(e.getMessage(), e);
                     return false;
                 }
             }));
@@ -171,11 +172,11 @@ public abstract class AbstractCanalAdapterWorker {
         } catch (Throwable e) {
             if (i == retry - 1) {
                 connector.ack();
-                logger.error(e.getMessage() + " Error sync but ACK!");
+                errorLogger.error(e.getMessage() + " Error sync but ACK!");
                 return true;
             } else {
                 connector.rollback();
-                logger.error(e.getMessage() + " Error sync and rollback, execute times: " + (i + 1));
+                errorLogger.error(e.getMessage() + " Error sync and rollback, execute times: " + (i + 1));
             }
             try {
                 Thread.sleep(500);
@@ -252,7 +253,7 @@ public abstract class AbstractCanalAdapterWorker {
             canalOuterAdapters.forEach(outerAdapters -> outerAdapters.forEach(OuterAdapter::destroy));
             logger.info("destination {} all adapters destroyed!", canalDestination);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            errorLogger.error(e.getMessage(), e);
         }
     }
 
