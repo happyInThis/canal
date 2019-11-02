@@ -137,9 +137,9 @@ public class ESTemplate {
         ESMapping mapping = config.getEsMapping();
         Map<String, Object> esFieldDataTmp = new LinkedHashMap<>(esFieldData.size());
         esFieldData.forEach((k, v) -> esFieldDataTmp.put(Util.cleanColumn(k), v));
-        String routingVal = (String) esFieldData.remove("$routing");
+        String routingVal = (String) esFieldData.get("$routing");
         if(pkVal == null || StringUtils.isBlank(pkVal.toString()) || StringUtils.isBlank(routingVal)) {
-            errorLogger.error("sync error 参数缺失, es index: {},table: {}, id : {}, routing:{},data:{}", mapping.get_index(), config.getDestination(), pkVal, routingVal, JSON.toJSONString(esFieldData));
+            errorLogger.error("sync error 参数缺失, es index: {},table: {}, id : {}, routing:{},data:{}", mapping.get_index(), esFieldData.get("$table"), pkVal, routingVal, JSON.toJSONString(esFieldData));
             if("online".equals(config.getEnv())) {
                 DateTime dateTime = new DateTime(System.currentTimeMillis());
                 Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
@@ -545,7 +545,7 @@ public class ESTemplate {
             routingVal = getValFromData(mapping,
                     dmlData,
                     routingFieldItem.getFieldName(),
-                    routingFieldItem.getFieldName());
+                    routingFieldItem.getColumnItems().iterator().next().getColumnName());
             if (routingVal != null) {
                 esFieldData.put("$routing", routingVal.toString());
             }
