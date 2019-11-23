@@ -26,6 +26,8 @@ import com.alibaba.otter.canal.client.adapter.es.service.ESSyncService;
 import com.alibaba.otter.canal.client.adapter.es.support.ESConnection;
 import com.alibaba.otter.canal.client.adapter.es.support.ESTemplate;
 import com.alibaba.otter.canal.client.adapter.support.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ES外部适配器
@@ -35,7 +37,7 @@ import com.alibaba.otter.canal.client.adapter.support.*;
  */
 @SPI("es")
 public class ESAdapter implements OuterAdapter {
-
+    private Logger logger = LoggerFactory.getLogger(ESMapping.class);
     private Map<String, ESSyncConfig>              esSyncConfig        = new ConcurrentHashMap<>(); // 文件名对应配置
     private Map<String, Map<String, ESSyncConfig>> dbTableEsSyncConfig = new ConcurrentHashMap<>(); // schema-table对应配置
 
@@ -155,21 +157,44 @@ public class ESAdapter implements OuterAdapter {
     private void sync(Dml dml) {
         String database = dml.getDatabase();
         String table = dml.getTable();
+        Dml newDml = copy(dml);
         Map<String, ESSyncConfig> configMap;
+        //TODO 这里需要增加一个配置项
+        if(true) {
+            String[] s = table.split("_");
+            table = StringUtils.join(s, "_", 0, s.length - 2);
+            newDml.setTable(table);
+        }
         if (envProperties != null && !"tcp".equalsIgnoreCase(envProperties.getProperty("canal.conf.mode"))) {
             configMap = dbTableEsSyncConfig
-                .get(StringUtils.trimToEmpty(dml.getDestination()) + "-" + StringUtils.trimToEmpty(dml.getGroupId())
+                .get(StringUtils.trimToEmpty(newDml.getDestination()) + "-" + StringUtils.trimToEmpty(newDml.getGroupId())
                      + "_" + database + "-" + table);
         } else {
             configMap = dbTableEsSyncConfig
-                .get(StringUtils.trimToEmpty(dml.getDestination()) + "_" + database + "-" + table);
+                .get(StringUtils.trimToEmpty(newDml.getDestination()) + "_" + database + "-" + table);
         }
 
         if (configMap != null && !configMap.values().isEmpty()) {
-            esSyncService.sync(configMap.values(), dml);
+            esSyncService.sync(configMap.values(), newDml);
         }
     }
 
+    private Dml copy(Dml oldDml) {
+        Dml dml = new Dml();
+        dml.setDestination(oldDml.getDestination());
+        dml.setGroupId(oldDml.getGroupId());
+        dml.setDatabase(oldDml.getDatabase());
+        dml.setTable(oldDml.getTable());
+        dml.setPkNames(oldDml.getPkNames());
+        dml.setIsDdl(oldDml.getIsDdl());
+        dml.setType(oldDml.getType());
+        dml.setEs(oldDml.getEs());
+        dml.setTs(oldDml.getTs());
+        dml.setSql(oldDml.getSql());
+        dml.setData(oldDml.getData());
+        dml.setOld(oldDml.getOld());
+        return dml;
+    }
     @Override
     public EtlResult etl(String task, List<String> params) {
         EtlResult etlResult = new EtlResult();

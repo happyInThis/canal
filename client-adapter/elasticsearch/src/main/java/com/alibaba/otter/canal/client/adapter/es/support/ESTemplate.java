@@ -72,19 +72,20 @@ public class ESTemplate {
         ESMapping mapping = config.getEsMapping();
         if (mapping.get_id() != null) {
             String parentVal = (String) esFieldData.remove("$parent_routing");
-            String routingVal = (String) esFieldData.remove("$routing");
+            String routingVal = (String) esFieldData.get("$routing");
             if(routingVal == null || StringUtils.isBlank(mapping.get_id()) || StringUtils.isBlank(routingVal)) {
                 errorLogger.error("sync error 参数缺失, es index: {},table: {}, id : {}, routing is null,data:{}", mapping.get_index(), config.getDestination(), pkVal, JSON.toJSONString(esFieldData));
+                if("online".equals(config.getEnv())) {
+                    DateTime dateTime = new DateTime(System.currentTimeMillis());
+                    Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
+                            "\n\n索引：" + config.getEsMapping().get_index() +
+                            "\n\ntable:" + esFieldData.get("$table") +
+                            "\n\nid:" + pkVal +
+                            "\n\nrouting:" + routingVal);
+                }
                 return;
             }
-            if("online".equals(config.getEnv())) {
-                DateTime dateTime = new DateTime(System.currentTimeMillis());
-                Util.sendWarnMsg("产生时间:" + dateTime.toString("yyyy-MM-dd HH:mm:ss") +
-                        "\n\n索引：" + config.getEsMapping().get_index() +
-                        "\n\ntable:" + esFieldData.get("$table") +
-                        "\n\nid:" + pkVal +
-                        "\n\nrouting:" + routingVal);
-            }
+
             esFieldData.remove("$table");
             if (mapping.isUpsert()) {
                 ESUpdateRequest updateRequest = esConnection.new ESUpdateRequest(mapping.get_index(),
@@ -273,8 +274,6 @@ public class ESTemplate {
                         }
                     }
                 }
-            } catch(Exception e) {
-                errorLogger.error("sync error 参数错误", e);
             } finally {
                 resetBulkRequestBuilder();
             }
@@ -500,7 +499,7 @@ public class ESTemplate {
                 routingVal = getValFromData(mapping,
                         dmlData,
                         routingFieldItem.getFieldName(),
-                        routingFieldItem.getFieldName());
+                        routingFieldItem.getColumnItems().iterator().next().getColumnName());
                 if (routingVal != null) {
                     esFieldData.put("$routing", routingVal.toString());
                 }
