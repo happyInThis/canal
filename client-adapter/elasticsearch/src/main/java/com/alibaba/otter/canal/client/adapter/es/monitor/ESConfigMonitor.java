@@ -1,12 +1,16 @@
 package com.alibaba.otter.canal.client.adapter.es.monitor;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.io.filefilter.FileFilterUtils;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationMonitor;
@@ -27,6 +31,7 @@ import com.alibaba.otter.canal.client.adapter.support.Util;
 public class ESConfigMonitor {
 
     private static final Logger   logger      = LoggerFactory.getLogger(ESConfigMonitor.class);
+    private static final Logger   errorLogger = LoggerFactory.getLogger("error");
 
     private static final String   adapterName = "es";
 
@@ -129,9 +134,10 @@ public class ESConfigMonitor {
 
         private void addConfigToCache(File file, ESSyncConfig config) {
             esAdapter.getEsSyncConfig().put(file.getName(), config);
-
-            SchemaItem schemaItem = SqlParser.parse(config.getEsMapping().getSql());
-            config.getEsMapping().setSchemaItem(schemaItem);
+            ESSyncConfig.ESMapping esMapping = config.getEsMapping();
+            String configString = JSON.toJSONString(config);
+            SchemaItem schemaItem = SqlParser.parse(esMapping.getSql());
+            esMapping.setSchemaItem(schemaItem);
 
             DruidDataSource dataSource = DatasourceConfig.DATA_SOURCES.get(config.getDataSourceKey());
             if (dataSource == null || dataSource.getUrl() == null) {
@@ -143,12 +149,33 @@ public class ESConfigMonitor {
                 throw new RuntimeException("Not found the schema of jdbc-url: " + config.getDataSourceKey());
             }
             String schema = matcher.group(2);
-
-            schemaItem.getAliasTableItems().values().forEach(tableItem -> {
-                Map<String, ESSyncConfig> esSyncConfigMap = esAdapter.getDbTableEsSyncConfig()
-                    .computeIfAbsent(schema + "-" + tableItem.getTableName(), k -> new HashMap<>());
-                esSyncConfigMap.put(file.getName(), config);
-            });
+            if(esMapping.getTableNameSql() != null) {
+                List<String> tableNameList = (List<String>) Util.sqlRS(dataSource, esMapping.getTableNameSql(), null, rs -> {
+                    List<String> tableNames = new ArrayList<>();
+                    try {
+                        while(rs.next()) {
+                            tableNames.add(rs.getString("table_name"));
+                        }
+                    } catch(Exception e) {
+                        errorLogger.error(e.getMessage(), e);
+                    }
+                    return tableNames;
+                });
+                esMapping.setTableNameList(tableNameList);
+                tableNameList.forEach(tableName -> {
+                    Map<String, ESSyncConfig> esSyncConfigMap = esAdapter.getDbTableEsSyncConfig().computeIfAbsent(schema + "-" + tableName, k -> new HashMap<>());
+                    ESSyncConfig esSyncConfig = JSONObject.parseObject(configString, ESSyncConfig.class);
+                    esSyncConfig.getEsMapping().setSql(esSyncConfig.getEsMapping().getSql().replace("placeholder", tableName));
+                    SchemaItem item = SqlParser.parse(esSyncConfig.getEsMapping().getSql());
+                    esSyncConfig.getEsMapping().setSchemaItem(item);
+                    esSyncConfigMap.put(file.getName(), esSyncConfig);
+                });
+            } else {
+                schemaItem.getAliasTableItems().values().forEach(tableItem -> {
+                    Map<String, ESSyncConfig> esSyncConfigMap = esAdapter.getDbTableEsSyncConfig().computeIfAbsent(schema + "-" + tableItem.getTableName(), k -> new HashMap<>());
+                    esSyncConfigMap.put(file.getName(), config);
+                });
+            }
 
         }
 

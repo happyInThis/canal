@@ -1,6 +1,7 @@
 package com.alibaba.otter.canal.client.adapter.rdb.config;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.alibaba.otter.canal.client.adapter.support.AdapterConfig;
@@ -29,6 +30,16 @@ public class MappingConfig implements AdapterConfig {
     @Override
     public String getEnv() {
         return null;
+    }
+
+    @Override
+    public List<String> getTableNameList() {
+        return null;
+    }
+
+    @Override
+    public Integer getQueryBatchSize() {
+        return 1000;
     }
 
     public String getDataSourceKey() {

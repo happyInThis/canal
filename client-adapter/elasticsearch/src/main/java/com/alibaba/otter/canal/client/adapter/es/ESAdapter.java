@@ -1,5 +1,6 @@
 package com.alibaba.otter.canal.client.adapter.es;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,8 @@ import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.action.search.SearchResponse;
 
@@ -38,6 +41,7 @@ import org.slf4j.LoggerFactory;
 @SPI("es")
 public class ESAdapter implements OuterAdapter {
     private Logger logger = LoggerFactory.getLogger(ESMapping.class);
+    private Logger errorLogger = LoggerFactory.getLogger("error");
     private Map<String, ESSyncConfig>              esSyncConfig        = new ConcurrentHashMap<>(); // 文件名对应配置
     private Map<String, Map<String, ESSyncConfig>> dbTableEsSyncConfig = new ConcurrentHashMap<>(); // schema-table对应配置
 
@@ -86,8 +90,11 @@ public class ESAdapter implements OuterAdapter {
             for (Map.Entry<String, ESSyncConfig> entry : esSyncConfig.entrySet()) {
                 String configName = entry.getKey();
                 ESSyncConfig config = entry.getValue();
-                SchemaItem schemaItem = SqlParser.parse(config.getEsMapping().getSql());
-                config.getEsMapping().setSchemaItem(schemaItem);
+                String configString = JSON.toJSONString(config);
+                ESMapping esMapping = config.getEsMapping();
+                //TODO 非真实表名
+                SchemaItem schemaItem = SqlParser.parse(esMapping.getSql());
+                esMapping.setSchemaItem(schemaItem);
 
                 DruidDataSource dataSource = DatasourceConfig.DATA_SOURCES.get(config.getDataSourceKey());
                 if (dataSource == null || dataSource.getUrl() == null) {
@@ -100,24 +107,45 @@ public class ESAdapter implements OuterAdapter {
                 }
                 String schema = matcher.group(2);
 
-                schemaItem.getAliasTableItems().values().forEach(tableItem -> {
-                    Map<String, ESSyncConfig> esSyncConfigMap;
-                    if (envProperties != null
-                        && !"tcp".equalsIgnoreCase(envProperties.getProperty("canal.conf.mode"))) {
-                        esSyncConfigMap = dbTableEsSyncConfig
-                            .computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "-"
-                                             + StringUtils.trimToEmpty(config.getGroupId()) + "_" + schema + "-"
-                                             + tableItem.getTableName(),
-                                k -> new ConcurrentHashMap<>());
-                    } else {
-                        esSyncConfigMap = dbTableEsSyncConfig
-                            .computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "_" + schema + "-"
-                                             + tableItem.getTableName(),
-                                k -> new ConcurrentHashMap<>());
-                    }
+                if(esMapping.getTableNameSql() != null) {
+                    List<String> tableNameList = (List<String>) Util.sqlRS(dataSource, esMapping.getTableNameSql(), null, rs -> {
+                        List<String> tableNames = new ArrayList<>();
+                        try {
+                            while(rs.next()) {
+                                tableNames.add(rs.getString("table_name"));
+                            }
+                        } catch(Exception e) {
+                            errorLogger.error(e.getMessage(), e);
+                        }
+                        return tableNames;
+                    });
+                    esMapping.setTableNameList(tableNameList);
+                    tableNameList.forEach(tableName -> {
+                        Map<String, ESSyncConfig> esSyncConfigMap;
+                        if(envProperties != null && !"tcp".equalsIgnoreCase(envProperties.getProperty("canal.conf.mode"))) {
+                            esSyncConfigMap = dbTableEsSyncConfig.computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "-" + StringUtils.trimToEmpty(config.getGroupId()) + "_" + schema + "-" + tableName, k -> new ConcurrentHashMap<>());
+                        } else {
+                            esSyncConfigMap = dbTableEsSyncConfig.computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "_" + schema + "-" + tableName, k -> new ConcurrentHashMap<>());
+                        }
+                        ESSyncConfig esSyncConfig = JSONObject.parseObject(configString, ESSyncConfig.class);
+                        esSyncConfig.getEsMapping().setSql(esSyncConfig.getEsMapping().getSql().replace("placeholder", tableName));
+                        logger.info("init configName:{}, table:{}, sql:{}",configName, tableName, esSyncConfig.getEsMapping().getSql());
+                        SchemaItem item = SqlParser.parse(esSyncConfig.getEsMapping().getSql());
+                        esSyncConfig.getEsMapping().setSchemaItem(item);
+                        esSyncConfigMap.put(configName, esSyncConfig);
+                    });
+                } else {
+                    schemaItem.getAliasTableItems().values().forEach(tableItem -> {
+                        Map<String, ESSyncConfig> esSyncConfigMap;
+                        if(envProperties != null && !"tcp".equalsIgnoreCase(envProperties.getProperty("canal.conf.mode"))) {
+                            esSyncConfigMap = dbTableEsSyncConfig.computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "-" + StringUtils.trimToEmpty(config.getGroupId()) + "_" + schema + "-" + tableItem.getTableName(), k -> new ConcurrentHashMap<>());
+                        } else {
+                            esSyncConfigMap = dbTableEsSyncConfig.computeIfAbsent(StringUtils.trimToEmpty(config.getDestination()) + "_" + schema + "-" + tableItem.getTableName(), k -> new ConcurrentHashMap<>());
+                        }
 
-                    esSyncConfigMap.put(configName, config);
-                });
+                        esSyncConfigMap.put(configName, config);
+                    });
+                }
             }
 
             Map<String, String> properties = configuration.getProperties();
@@ -157,44 +185,22 @@ public class ESAdapter implements OuterAdapter {
     private void sync(Dml dml) {
         String database = dml.getDatabase();
         String table = dml.getTable();
-        Dml newDml = copy(dml);
         Map<String, ESSyncConfig> configMap;
-        //TODO 这里需要增加一个配置项
-        if(true) {
-            String[] s = table.split("_");
-            table = StringUtils.join(s, "_", 0, s.length - 2);
-            newDml.setTable(table);
-        }
+
         if (envProperties != null && !"tcp".equalsIgnoreCase(envProperties.getProperty("canal.conf.mode"))) {
             configMap = dbTableEsSyncConfig
-                .get(StringUtils.trimToEmpty(newDml.getDestination()) + "-" + StringUtils.trimToEmpty(newDml.getGroupId())
+                .get(StringUtils.trimToEmpty(dml.getDestination()) + "-" + StringUtils.trimToEmpty(dml.getGroupId())
                      + "_" + database + "-" + table);
         } else {
             configMap = dbTableEsSyncConfig
-                .get(StringUtils.trimToEmpty(newDml.getDestination()) + "_" + database + "-" + table);
+                .get(StringUtils.trimToEmpty(dml.getDestination()) + "_" + database + "-" + table);
         }
 
         if (configMap != null && !configMap.values().isEmpty()) {
-            esSyncService.sync(configMap.values(), newDml);
+            esSyncService.sync(configMap.values(), dml);
         }
     }
 
-    private Dml copy(Dml oldDml) {
-        Dml dml = new Dml();
-        dml.setDestination(oldDml.getDestination());
-        dml.setGroupId(oldDml.getGroupId());
-        dml.setDatabase(oldDml.getDatabase());
-        dml.setTable(oldDml.getTable());
-        dml.setPkNames(oldDml.getPkNames());
-        dml.setIsDdl(oldDml.getIsDdl());
-        dml.setType(oldDml.getType());
-        dml.setEs(oldDml.getEs());
-        dml.setTs(oldDml.getTs());
-        dml.setSql(oldDml.getSql());
-        dml.setData(oldDml.getData());
-        dml.setOld(oldDml.getOld());
-        return dml;
-    }
     @Override
     public EtlResult etl(String task, List<String> params) {
         EtlResult etlResult = new EtlResult();

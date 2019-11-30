@@ -23,6 +23,7 @@ public class ESSyncConfig implements AdapterConfig {
 
     private String    destination;     // canal destination
     private String    env;     // canal env
+    private Integer   queryBatchSize = 10000;     // canal queryBatchSize
     private int       delayTime;     // canal delay
     private String    skipType;     // canal skip
 
@@ -75,8 +76,23 @@ public class ESSyncConfig implements AdapterConfig {
         this.destination = destination;
     }
 
+    @Override
     public String getEnv() {
         return env;
+    }
+
+    @Override
+    public List<String> getTableNameList() {
+        return esMapping.getTableNameList();
+    }
+
+    @Override
+    public Integer getQueryBatchSize() {
+        return queryBatchSize;
+    }
+
+    public void setQueryBatchSize(Integer queryBatchSize) {
+        this.queryBatchSize = queryBatchSize;
     }
 
     public void setEnv(String env) {
@@ -121,6 +137,8 @@ public class ESSyncConfig implements AdapterConfig {
         private String                       pk;
         private Map<String, RelationMapping> relations       = new LinkedHashMap<>();
         private String                       sql;
+        private String                       tableNameSql;
+        private List<String>                 tableNameList;
         // 对象字段, 例: objFields:
         // - _labels: array:;
         private Map<String, String>          objFields       = new LinkedHashMap<>();
@@ -210,6 +228,22 @@ public class ESSyncConfig implements AdapterConfig {
 
         public void setSql(String sql) {
             this.sql = sql;
+        }
+
+        public String getTableNameSql() {
+            return tableNameSql;
+        }
+
+        public void setTableNameSql(String tableNameSql) {
+            this.tableNameSql = tableNameSql;
+        }
+
+        public List<String> getTableNameList() {
+            return tableNameList;
+        }
+
+        public void setTableNameList(List<String> tableNameList) {
+            this.tableNameList = tableNameList;
         }
 
         public int getCommitBatch() {

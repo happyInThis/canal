@@ -27,6 +27,14 @@ public class MappingConfig implements AdapterConfig {
         return null;
     }
 
+    @Override
+    public List<String> getTableNameList() {
+        return null;
+    }
+    @Override
+    public Integer getQueryBatchSize() {
+        return 1000;
+    }
     public String getDataSourceKey() {
         return dataSourceKey;
     }

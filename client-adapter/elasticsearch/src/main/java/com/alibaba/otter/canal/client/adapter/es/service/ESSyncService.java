@@ -233,7 +233,7 @@ public class ESSyncService {
                 String columnName = fieldItem.getColumnItems().iterator().next().getColumnName();
 
                 if (old.containsKey(columnName) && !config.getEsMapping().getSkips().contains(fieldItem.getFieldName()) &&
-                        schemaItem.getAliasTableItems().get(fieldItem.getOwner()).getTableName().equals(dml.getTable())) {
+                        dml.getTable().equalsIgnoreCase(schemaItem.getAliasTableItems().get(fieldItem.getOwner()).getTableName())) {
                     isContinue = false;
                     break;
                 }

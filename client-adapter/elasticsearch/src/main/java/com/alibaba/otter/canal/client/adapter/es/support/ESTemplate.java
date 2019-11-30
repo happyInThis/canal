@@ -531,7 +531,7 @@ public class ESTemplate {
                 resultIdVal = getValFromData(mapping, dmlData, fieldItem.getFieldName(), columnName);
             }
             if (dmlOld.containsKey(columnName) && !mapping.getSkips().contains(fieldItem.getFieldName()) &&
-                    mapping.getSchemaItem().getAliasTableItems().get(fieldItem.getOwner()).getTableName().equals(tableName)) {
+                    tableName.equalsIgnoreCase(schemaItem.getAliasTableItems().get(fieldItem.getOwner()).getTableName())) {
                 esFieldData.put(Util.cleanColumn(fieldItem.getFieldName()),
                         getValFromData(mapping, dmlData, fieldItem.getFieldName(), columnName));
             }
