@@ -391,7 +391,9 @@ public class ESSyncService {
                                 mapping.get_index(),
                                 idVal);
                         }
-                        esTemplate.delete(mapping, idVal, null);
+                        Map<String, Object> esFieldData = new LinkedHashMap<>();
+                        esTemplate.getESDataFromDmlData(mapping, data, esFieldData);
+                        esTemplate.delete(mapping, idVal, esFieldData);
                     } else {
                         // ------主键带函数, 查询sql获取主键删除------
                         // FIXME 删除时反查sql为空记录, 无法获获取 id field 值

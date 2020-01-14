@@ -233,10 +233,22 @@ public class ESTemplate {
      * @param esFieldData 数据Map
      */
     public void delete(ESMapping mapping, Object pkVal, Map<String, Object> esFieldData) {
+        if(pkVal == null) {
+            logger.info("pkVal is null");
+            return;
+        }
+        String routingVal = (String) esFieldData.get("$routing");
+        if(StringUtils.isBlank(routingVal)) {
+            errorLogger.error("routing is missing id:{}", pkVal);
+            return;
+        }
         if (mapping.get_id() != null) {
             ESDeleteRequest esDeleteRequest = this.esConnection.new ESDeleteRequest(mapping.get_index(),
                     mapping.get_type(),
                     pkVal.toString());
+            if(StringUtils.isNotBlank(routingVal)) {
+                esDeleteRequest.setRouting(routingVal);
+            }
             getBulk().add(esDeleteRequest);
             commitBulk();
         } else {
@@ -247,6 +259,9 @@ public class ESTemplate {
                 ESUpdateRequest esUpdateRequest = this.esConnection.new ESUpdateRequest(mapping.get_index(),
                         mapping.get_type(),
                         hit.getId()).setDoc(esFieldData);
+                if(StringUtils.isNotBlank(routingVal)) {
+                    esUpdateRequest.setRouting(routingVal);
+                }
                 getBulk().add(esUpdateRequest);
                 commitBulk();
             }

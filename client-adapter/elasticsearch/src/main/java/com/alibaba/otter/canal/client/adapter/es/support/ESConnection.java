@@ -273,6 +273,15 @@ public class ESConnection {
             }
         }
 
+        public ESDeleteRequest setRouting(String routing){
+            if (mode == ESClientMode.TRANSPORT) {
+                deleteRequestBuilder.setRouting(routing);
+            } else {
+                deleteRequest.routing(routing);
+            }
+            return this;
+        }
+
         public DeleteRequestBuilder getDeleteRequestBuilder() {
             return deleteRequestBuilder;
         }
